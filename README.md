@@ -2,7 +2,7 @@
 
 A comprehensive Rust library for actuarial mortality table calculations and life insurance mathematics, following standard actuarial principles and notation.
 
-**Built on Polars** - Leveraging the latest high-performance DataFrame technology for lightning-fast actuarial computations with memory efficiency and parallel processing capabilities that outperform traditional pandas-based solutions.
+**Built on Polars** - Leveraging high-performance DataFrame technology for fast actuarial computations with memory efficiency and parallel processing capabilities.
 
 [![Crates.io](https://img.shields.io/crates/v/rslife.svg)](https://crates.io/crates/rslife)
 [![Documentation](https://docs.rs/rslife/badge.svg)](https://docs.rs/rslife)
@@ -10,11 +10,12 @@ A comprehensive Rust library for actuarial mortality table calculations and life
 
 ## Features
 
-- **XML Parsing**: Load mortality data from Society of Actuaries (SOA) XML sources using the ACORD XTbML standard ([mort.soa.org](https://mort.soa.org/About.aspx))
+- **Performance Optimized**: 4-level detail system automatically optimizes calculations for your needs
+- **XML Parsing**: Load mortality data from Society of Actuaries (SOA) XML sources using ACORD XTbML standard
 - **Multiple Mortality Assumptions**: UDD, CFM, and HPB methods for fractional age calculations
-- **Comprehensive Actuarial Functions**: Life insurance, annuities, and demographic calculations
-- **Standard Notation**: Follows traditional actuarial notation (Ax, axn, etc.)
-- **Polars Integration**: Built on top of Polars DataFrames for efficient data processing
+- **Comprehensive Functions**: Life insurance, annuities, and demographic calculations
+- **Standard Notation**: Follows traditional actuarial notation (Ax, äx, etc.)
+- **Polars Integration**: Built on Polars DataFrames for efficient data processing
 - **Well-Documented**: Extensive documentation with mathematical formulations
 
 ## Quick Start
@@ -23,142 +24,142 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rslife = "0.1.0"
+rslife = "0.1.1"
 ```
 
-### Using the Prelude (Recommended)
-
-The easiest way to get started is using the prelude module:
+### Basic Example
 
 ```rust
 use rslife::prelude::*;
 
 fn main() -> PolarsResult<()> {
-    // Load mortality data from XML
-    let elt_15_female_xml = MortXML::from_url_id(1704)?;
+    // Load mortality data from SOA
+    let xml = MortXML::from_url_id(1704)?;
 
     // Configure mortality table
     let config = MortTableConfig {
-        xml: elt_15_female_xml,
+        xml,
         l_x_init: 100_000,
         pct: Some(1.0),
         int_rate: Some(0.03),
         assumption: Some(AssumptionEnum::UDD),
     };
 
-    // Generate mortality table
-    let mortality_table = config.gen_mort_table()?;
-    println!("Generated mortality table with {} rows", mortality_table.height());
-
     // Calculate actuarial values
     let whole_life_35 = Ax(&config, 35)?;
-    let term_insurance_35_20 = Axn(&config, 35, 20)?;
-    let life_annuity_35_12 = axn_due(&config, 35, 20, 12)?;
+    let life_annuity_35 = aaxn(&config, 35, 1)?;
+
+    // Fractional age survival
+    let survival_5_years = tpx(&config, 5.0, 30.0)?;
 
     println!("Whole life insurance (age 35): {:.6}", whole_life_35);
-    println!("20-year term insurance (age 35): {:.6}", term_insurance_35_20);
-    println!("20-year life annuity due (age 35): {:.6}", life_annuity_35_12);
+    println!("Life annuity due (age 35): {:.6}", life_annuity_35);
+    println!("5-year survival from age 30: {:.6}", survival_5_years);
 
     Ok(())
 }
 ```
 
-### Manual Imports
+## Performance Optimization
 
-If you prefer explicit imports:
+RSLife automatically optimizes performance with a 4-level detail system:
 
-```rust
-use rslife::xml::MortXML;
-use rslife::actuarial::{MortTableConfig, AssumptionEnum, Ax, Axn, axn_due};
-use polars::prelude::PolarsResult;
-```
+- **Level 1** (~10x faster): Basic mortality rates (`qx`, `px`)
+- **Level 2** (~5x faster): Demographics (`lx`, `dx`)
+- **Level 3** (~2x faster): Commutation functions (`Dx`, `Nx`, etc.)
+- **Level 4** (complete): All actuarial functions (`Ax`, `äx`, etc.)
+
+Functions automatically use the minimum required level for optimal performance.
 
 ## Mortality Assumptions
 
 The library supports three standard actuarial assumptions for fractional age calculations:
 
-**Note**: The codebase is organized into `wholes.rs` (integer ages only) and `fractionals.rs` (fractional ages with UDD/CFM/HPB assumptions). Currently, most functions are in `wholes.rs` for compatibility, but future updates will migrate calculations to `fractionals.rs` to properly support all three mortality assumptions.
-
 ### UDD (Uniform Distribution of Deaths)
+
 Linear interpolation between integer ages:
-$${}_{t}p_x = 1 - t \cdot q_x$$
+
+```text
+ₜpₓ = 1 - t · qₓ
+```
 
 ### CFM (Constant Force of Mortality)
+
 Exponential survival model:
-$${}_{t}p_x = (1 - q_x)^t$$
+
+```text
+ₜpₓ = (1 - qₓ)ᵗ
+```
 
 ### HPB (Hyperbolic/Balmer)
+
 Hyperbolic interpolation:
-$${}_{t}p_x = \frac{1 - q_x}{1 - (1-t) \cdot q_x}$$
 
-## Available Functions
+```text
+ₜpₓ = (1 - qₓ) / (1 - (1-t) · qₓ)
+```
 
-### Life Insurance Benefits
+## Key Functions
 
-| Function | Description | Notation |
-|----------|-------------|----------------|
-| `Ax(config, x)` | Whole life insurance | $A_x$ |
-| `Axn(config, x, n)` | n-year term insurance | $A^1_{x:\overline{n\|}}$ |
-| `Exn(config, x, n)` | n-year pure endowment | $E_{x:n}$ |
-| `AExn(config, x, n)` | n-year endowment | $A_{x:\overline{n\|}}$ |
-| `IAx(config, x)` | Increasing whole life | $(IA)_x$ |
-| `IAxn(config, x, n)` | Increasing term | $(IA)^1_{x:\overline{n\|}}$ |
-| `tAx(config, x, t)` | t-year deferred whole life | ${}_{t\|}A_x$ |
-| `tAxn(config, x, n, t)` | t-year deferred term | ${}_{t\|}A^1_{x:\overline{n\|}}$ |
-| `tExn(config, x, n, t)` | t-year deferred pure endowment | ${}_{t\|}E_{x:n}$ |
-| `tAExn(config, x, n, t)` | t-year deferred endowment | ${}_{t\|}A_{x:\overline{n\|}}$ |
-| `gAx(config, x, g)` | Geometric increasing whole life | $A_x^{(g)}$ |
-| `gAxn(config, x, n, g)` | Geometric increasing term | $(A^{(g)})^1_{x:\overline{n\|}}$ |
+### Life Insurance
+
+- `Ax(config, x)` - Whole life insurance
+- `Axn(config, x, n)` - Term insurance
+- `Exn(config, x, n)` - Pure endowment
+- `AExn(config, x, n)` - Endowment
+- `IAx(config, x)` - Increasing whole life
+- `IAxn(config, x, n)` - Increasing term insurance
+- `gAx(config, x, g)` - Geometric increasing whole life
+- `gAxn(config, x, n, g)` - Geometric increasing term insurance
+
+### Deferred Insurance
+
+- `tAx(config, x, t)` - Deferred whole life insurance
+- `tAxn(config, x, t, n)` - Deferred term insurance
+- `tExn(config, x, t, n)` - Deferred pure endowment
+- `tAExn(config, x, t, n)` - Deferred endowment
 
 ### Annuities
 
-| Function | Description | Notation |
-|----------|-------------|----------------|
-| `axn_due(config, x, n, m)` | n-year life annuity due (m-payable) | $\ddot{a}_{x:\overline{n\|}}^{(m)}$ |
-| `tax_due(config, x, t, m)` | t-year deferred annuity (m-payable) | ${}_{t\|}\ddot{a}_x^{(m)}$ |
-| `taxn_due(config, x, n, t, m)` | t-year deferred term annuity (m-payable) | ${}_{t\|}\ddot{a}_{x:\overline{n\|}}^{(m)}$ |
-| `Iax_due(config, x, n, m)` | Increasing whole life annuity due (m-payable) | $(I\ddot{a})_x^{(m)}$ |
-| `Iaxn_due(config, x, n, m)` | Increasing n-year annuity due (m-payable) | $(I\ddot{a})_{x:\overline{n\|}}^{(m)}$ |
-| `tIax_due(config, x, n, t, m)` | t-year deferred increasing annuity (m-payable) | ${}_{t\|}(I\ddot{a})_x^{(m)}$ |
-| `tIaxn_due(config, x, n, t, m)` | t-year deferred increasing term annuity (m-payable) | ${}_{t\|}(I\ddot{a})_{x:\overline{n\|}}^{(m)}$ |
-| `gIax_due(config, x, n, m, g)` | Geometric increasing annuity due (m-payable) | $(I\ddot{a})_x^{(g,m)}$ |
-| `gIaxn_due(config, x, n, m, g)` | Geometric increasing term annuity due (m-payable) | $(I\ddot{a})_{x:\overline{n\|}}^{(g,m)}$ |
+- `aax(config, x, m)` - Life annuity due with m payable
+- `aaxn(config, x, n, m)` - Life temporary annuity due with m payable
+- `Iaax(config, x, n, m)` - Increasing annuity with m payable
+- `Iaaxn(config, x, n, m)` - Increasing temporary annuity with m payable
+- `gIaax(config, x, n, m, g)` - Geometric increasing annuity with m payable
+- `gIaaxn(config, x, n, m, g)` - Geometric increasing temporary annuity with m payable
 
-### Fractional Age Functions
+### Deferred Annuities
 
-| Function | Description | Notation |
-|----------|-------------|----------------|
-| `tpx(config, t, x)` | Survival probability for t years | ${}_{t}p_x$ |
-| `tqx(config, t, x)` | Death probability within t years | ${}_{t}q_x$ |
-| `conditional_tqx(config, t, x, s)` | Conditional death probability | ${}_{t\mid s}q_x$ |
+- `taax(config, x, t, m)` - Deferred annuity with m payable
+- `taaxn(config, x, t, n, m)` - Deferred temporary annuity with m payable
+- `tIaax(config, x, n, t, m)` - Deferred increasing annuity with m payable
+- `tIaaxn(config, x, n, t, m)` - Deferred increasing temporary annuity with m payable
 
-## XML Data Sources
+  ### Survival Functions
+
+- `tpx(config, t, x)` - Survival probability for t years
+- `tqx(config, t, x)` - Death probability within t years
+
+## Data Sources
 
 Load mortality data from various sources:
-
+****
 ```rust
-use rslife::prelude::*;
-
-// From SOA table ID (downloads from mort.soa.org)
-let xml1 = MortXML::from_url_id(1704)?;
-
-// From local table ID (loads from src/table_xml/ folder)
-let xml2 = MortXML::from_id(912)?;
-
-// From direct URL
-let xml3 = MortXML::from_url("https://mort.soa.org/data/t1704.xml")?;
+// From SOA website (by table ID)
+let xml = MortXML::from_url_id(1704)?;****
 
 // From local file
-let xml4 = MortXML::from_path(Path::new("t1704.xml"))?;
+let xml = MortXML::from_path("mortality_table.xml")?;
 
+// From URL
+let xml = MortXML::from_url("https://mort.soa.org/data/t1704.xml")?;
+```rust
 // From XML string
-let xml_string = r#"<xml>...</xml>"#;
-let xml5 = MortXML::from_string(xml_string)?;
+let xml_string = r#"<MortalityTable>...</MortalityTable>"#;
+let xml = MortXML::from_string(xml_string)?;
 ```
 
-**Note**: The `from_id()` method loads XML files from the default `src/table_xml/` folder, while `from_url_id()` downloads directly from the SOA website.
-
-**Table IDs**: You can find mortality table IDs at [mort.soa.org](https://mort.soa.org/Default.aspx) - the first column with title "#" contains the ID numbers to use with `from_id()` and `from_url_id()` functions.
+**Table IDs**: You can find mortality table IDs at [mort.soa.org](https://mort.soa.org/Default.aspx) - the first column with title "#" contains the ID numbers.
 
 
 ## Examples
@@ -171,18 +172,18 @@ Check out the `examples/` directory for more comprehensive examples:
 
 ## Mathematical Documentation
 
-All functions include comprehensive mathematical documentation with LaTeX formulas. View the full documentation at [docs.rs/rslife](https://docs.rs/rslife).
+All functions include comprehensive mathematical documentation with Unicode formulas. View the full documentation at [docs.rs/rslife](https://docs.rs/rslife).
 
 **Note**: Function names follow traditional actuarial notation (e.g., `Ax`, `Axn`) rather than Rust's snake_case convention to maintain consistency with mathematical literature and industry standards. The compiler warnings about snake_case naming can be safely ignored for this domain-specific library.
 
-**Math Rendering**: The notation in this README uses GitHub's limited math rendering. For complete actuarial notation with proper symbols (including annuity bars, life tables, and complex subscripts), refer to the generated rustdoc documentation which supports full LaTeX rendering with actuarial packages.
+**Math Rendering**: The notation in this README and documentation uses Unicode characters for optimal rendering on both GitHub and crates.io, ensuring mathematical formulas display correctly across all platforms without requiring LaTeX rendering support.
 
 ## Roadmap
 
 ### Version 0.2.0 (Q4 2025)
 
-- **Enhanced Fractional Age Support**: Migrate all calculations to `fractionals.rs` module for full UDD/CFM/HPB assumption support
-- **Selection with Duration Tables**: Add support for selection with duration table XML parsing and calculations ($q_{[x]+t}$ notation)
+- **Enhanced Fractional Age Support**: Migrate all calculations to `fractional.rs` module for full UDD/CFM/HPB assumption support
+- **Selection with Duration Tables**: Add support for selection with duration table XML parsing and calculations (qₓ₊ₜ notation)
 - **Additional Mortality Functions**: Add `lx`, `dx`, `qx` series functions for demographic analysis
 - **Performance Optimizations**: Implement caching for commutation function calculations
 - **Extended XML Support**: Add support for additional mortality table formats and international standards
@@ -225,6 +226,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 Project Link: [https://github.com/hnlearndev/Basic-Term-Model-Rust-lifelibBasicTermSM](https://github.com/hnlearndev/Basic-Term-Model-Rust-lifelibBasicTermSM)
 
 ## References
+
 - [Actuarial Mathematics (Bowers et al.)](https://www.soa.org/shop/actuarial-mathematics/)
 - [Society of Actuaries Mortality Tables](https://mort.soa.org/Default.aspx)
 - Standard actuarial notation and practices
@@ -232,15 +234,18 @@ Project Link: [https://github.com/hnlearndev/Basic-Term-Model-Rust-lifelibBasicT
 ### Similar Projects
 
 **Python:**
+
 - [pylife](https://github.com/actuarialopensource/pylife) - Python library for actuarial calculations and life insurance mathematics
 - [pymort](https://github.com/actuarialopensource/pymort) - Python mortality table library with XML parsing capabilities
 
 **R:**
+
 - [lifecontingencies](https://github.com/spedygiorgio/lifecontingencies) - R package for actuarial life contingencies calculations
 - [MortalityTables](https://github.com/kainhofer/r-mortality-tables) - R package for working with life and pension tables
 - [demography](https://github.com/robjhyndman/demography) - R package for demographic analysis and mortality forecasting
 
 **Julia:**
+
 - [MortalityTables.jl](https://github.com/JuliaActuary/MortalityTables.jl) - Julia package for mortality table calculations and life contingencies
 - [ActuaryUtilities.jl](https://github.com/JuliaActuary/ActuaryUtilities.jl) - Julia utilities for actuarial modeling and analysis
 

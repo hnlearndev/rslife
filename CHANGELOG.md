@@ -1,0 +1,59 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.1.1] - 2025-07-20
+
+### Changed
+- **BREAKING**: Updated annuity function naming convention to follow standard actuarial notation
+  - `axn_due` → `aaxn`
+  - `tax_due` → `taax`
+  - `taxn_due` → `taaxn`
+  - `Iax_due` → `Iaax`
+  - `Iaxn_due` → `Iaaxn`
+  - `tIax_due` → `tIaax`
+  - `tIaxn_due` → `tIaaxn`
+  - `gIax_due` → `gIaax`
+  - `gIaxn_due` → `gIaaxn`
+
+### Updated
+- All documentation and examples to reflect new function names
+- Function exports in prelude module
+- Test files to use new naming convention
+- README.md with comprehensive function documentation organized by categories
+
+### Migration Guide
+If upgrading from 0.1.0, update your function calls:
+```rust
+// Old (0.1.0)
+let annuity = axn_due(&config, 65, 20, 1)?;
+let deferred = tax_due(&config, 65, 10, 1)?;
+
+// New (0.1.1)
+let annuity = aaxn(&config, 65, 20, 1)?;
+let deferred = taax(&config, 65, 10, 1)?;
+```
+
+## [0.1.0] - 2025-07-20
+
+### Added
+- Initial release of RSLife actuarial library
+- Comprehensive mortality table calculations
+- XML parsing for Society of Actuaries mortality data
+- Life insurance functions (Ax, Axn, AExn, etc.)
+- Annuity calculations with multiple payment frequencies
+- Fractional age calculations with UDD, CFM, and HPB assumptions
+- Performance optimization with 4-level detail system
+- Polars DataFrame integration for efficient data processing
+- Full prelude module for convenient imports
+
+### Features
+- Standard actuarial notation following industry conventions
+- Support for geometric and arithmetic increasing benefits
+- Deferred insurance and annuity calculations
+- Survival and mortality probability functions
+- Well-documented API with mathematical formulations
+- Integration tests ensuring function reliability

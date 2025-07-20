@@ -3,376 +3,143 @@
 use crate::xml::MortXML;
 use polars::prelude::*;
 
-/// Mortality assumption types for fractional age calculations.
+/// Mortality assumptions for fractional age calculations.
 ///
-/// These assumptions determine how mortality is distributed within each age interval
-/// and affect calculations involving fractional ages or time periods.
+/// Determines how mortality is distributed within age intervals, affecting
+/// fractional survival probabilities ₜpₓ for time t at age x:
 ///
-/// # Mathematical Formulations
+/// - **UDD**: ₜpₓ = 1 - t·qₓ (most common, conservative)
+/// - **CFM**: ₜpₓ = (1-qₓ)ᵗ (constant force, mathematical convenience)
+/// - **HPB**: ₜpₓ = (1-qₓ)/(1-(1-t)·qₓ) (hyperbolic, balanced approach)
 ///
-/// For fractional time $t$ at age $x$, the survival probability ${}_{t}p_x$ is calculated as:
-///
-/// **UDD (Uniform Distribution of Deaths)**:
-/// $${}_{t}p_x = 1 - t \cdot q_x$$
-///
-/// **CFM (Constant Force of Mortality)**:
-/// $${}_{t}p_x = (1 - q_x)^t$$
-///
-/// **HPB (Hyperbolic/Balmer)**:
-/// $${}_{t}p_x = \frac{1 - q_x}{1 - (1-t) \cdot q_x}$$
-///
-/// Where $q_x$ is the annual mortality rate at age $x$.
-///
-/// # Use Cases
-///
-/// - **UDD**: Most conservative assumption, commonly used in life insurance
-/// - **CFM**: Mathematical convenience, used in continuous-time models
-/// - **HPB**: Balances between UDD and CFM, used in some pension calculations
-///
-/// # Examples
-///
+/// # Example
 /// ```rust
-/// use rslife::AssumptionEnum;
+/// use rslife::prelude::*;
 ///
-/// // Different assumptions for fractional age calculations
-/// let udd_assumption = AssumptionEnum::UDD;
-/// let cfm_assumption = AssumptionEnum::CFM;
-/// let hpb_assumption = AssumptionEnum::HPB;
+/// let assumption = AssumptionEnum::UDD; // Most common choice
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AssumptionEnum {
-    /// Uniform Distribution of Deaths
-    ///
-    /// Assumes deaths are uniformly distributed within each age interval.
-    /// The force of mortality increases linearly throughout the year:
-    /// $$\mu_{x+t} = \frac{q_x}{1-t \cdot q_x}$$
-    ///
-    /// This is the most commonly used assumption in life insurance calculations.
+    /// Uniform Distribution of Deaths - most common assumption.
     UDD,
 
-    /// Constant Force of Mortality
-    ///
-    /// Assumes the force of mortality is constant within each age interval.
-    /// The constant force is given by:
-    /// $$\mu_x = -\ln(1-q_x)$$
-    ///
-    /// This assumption provides mathematical convenience for continuous-time models.
+    /// Constant Force of Mortality - mathematical convenience.
     CFM,
 
-    /// Hyperbolic (Balmer) Assumption
-    ///
-    /// Assumes a hyperbolic distribution of deaths within each age interval.
-    /// The force of mortality decreases throughout the year:
-    /// $$\mu_{x+t} = \frac{q_x}{1+t \cdot q_x}$$
-    ///
-    /// This assumption provides a middle ground between UDD and CFM.
+    /// Hyperbolic (Balmer) - balanced between UDD and CFM.
     HPB,
 }
 
-/// Configuration for generating complete mortality tables with demographic and actuarial functions.
+/// Configuration for generating mortality tables with demographic and actuarial functions.
 ///
-/// This struct contains all parameters needed to generate a comprehensive mortality table
-/// from XML source data, including basic demographic movement functions and optional
-/// commutation functions for actuarial present value calculations.
+/// Generates mortality tables from XML data with configurable detail levels, from basic
+/// rates to complete commutation functions for actuarial present value calculations.
 ///
-/// # Fields
-///
-/// - `xml`: Source mortality data in standardized XML format
-/// - `l_x_init`: Initial population size (radix) - typically 100,000 or 1,000,000
-/// - `pct`: Optional percentage multiplier for mortality rates (e.g., 0.5 for 50% of base rates)
-/// - `int_rate`: Optional interest rate for present value calculations and commutation functions
-/// - `assumption`: Mortality assumption for fractional age calculations
-///
-/// # Mathematical Background
-///
-/// The mortality table generation follows standard actuarial principles:
-///
-/// ## Rate Adjustment
-/// When a percentage is specified:
-/// $$q_x^{adjusted} = q_x^{base} \times pct$$
-///
-/// ## Demographic Functions
-/// - **Population**: $l_{x+1} = l_x \times (1 - q_x)$
-/// - **Deaths**: $d_x = l_x \times q_x$
-///
-/// ## Commutation Functions (when interest rate provided)
-/// - **Present Value Factor**: $v = \frac{1}{1+i}$
-/// - **Life Commutation**: $D_x = v^x \times l_x$
-/// - **Death Commutation**: $C_x = v^{x+1} \times d_x$
+/// # Core Formula
+/// - Rate adjustment: qₓᶠⁱⁿᵃˡ = qₓᵇᵃˢᵉ × pct
+/// - Life table: lₓ₊₁ = lₓ × (1 - qₓ), dₓ = lₓ × qₓ
+/// - Commutation: Dₓ = vˣ × lₓ, Cₓ = vˣ⁺¹ × dₓ (when interest provided)
 ///
 /// # Examples
 ///
-/// ## Basic mortality table without interest:
-/// ```rust
-/// use rslife::{MortXML, MortTableConfig, AssumptionEnum};
-///
-/// let xml = MortXML::from_url_id(1704)?;
-/// let config = MortTableConfig {
-///     xml,
-///     l_x_init: 100_000,  // Standard radix of 100,000 lives
-///     pct: Some(1.0),      // Use 100% of base mortality rates
-///     int_rate: None,      // No interest rate calculations
-///     assumption: Some(AssumptionEnum::UDD), // UDD for fractional ages
-/// };
-///
-/// let table = config.gen_mort_table()?;
-/// // Generates table with columns: age, qx, lx, dx
-/// ```
-///
-/// ## Complete actuarial table with commutation functions:
-/// ```rust
-/// let config = MortTableConfig {
-///     xml,
-///     l_x_init: 100_000,
-///     pct: Some(0.5),        // Use 50% of standard mortality (improved mortality)
-///     int_rate: Some(0.03),  // 3% annual interest rate
-///     assumption: Some(AssumptionEnum::CFM),
-/// };
-///
-/// let actuarial_table = config.gen_mort_table()?;
-/// // Generates complete table with commutation functions:
-/// // age, qx, lx, dx, Cx, Dx, Mx, Nx, Px, Rx, Sx
-/// ```
-///
-/// ## Substandard mortality (higher risk):
-/// ```rust
-/// let high_risk_config = MortTableConfig {
-///     xml,
-///     l_x_init: 100_000,
-///     pct: Some(1.5),        // 150% of standard mortality rates
-///     int_rate: Some(0.04),  // 4% interest rate
-///     assumption: Some(AssumptionEnum::HPB),
-/// };
-///
-/// let substandard_table = high_risk_config.gen_mort_table()?;
-/// ```
-///
-/// # Data Sources
-///
-/// The `xml` field should contain mortality data from sources such as:
-/// - Society of Actuaries (SOA) mortality tables
-/// - National statistical office life tables
-/// - Insurance company experience tables
-/// - Custom mortality studies
-///
-/// # Performance Considerations
-///
-/// - Memory allocation is optimized with pre-sized vectors
-/// - Sequential processing maintains actuarial dependencies
-/// - Large tables (1000+ ages) typically process in milliseconds
-/// - Commutation functions add minimal computational overhead
-///
-/// # Limitations
-///
-/// - Currently supports single-table XML sources only
-/// - Duration-based mortality tables are not yet implemented
-/// - The `assumption` field is reserved for future fractional age implementations
-///
-/// # See Also
-///
-/// - [`gen_mort_table()`](MortTableConfig::gen_mort_table) for the main table generation method
-/// - [`AssumptionEnum`] for mortality assumption types
-/// - [`MortXML`] for loading and parsing mortality data
+/// See [`MortTableConfig::gen_mort_table`] for detailed usage and examples.
 #[derive(Debug, Clone)]
 pub struct MortTableConfig {
-    /// Source mortality data in XML format.
-    ///
-    /// Must contain exactly one mortality table with age-based data.
-    /// The XML should follow standard mortality table formats with
-    /// columns for age and mortality rates.
+    /// Source mortality data (must contain exactly one age-based table).
     pub xml: MortXML,
 
-    /// Initial population size (radix) for the life table.
-    ///
-    /// This represents the hypothetical starting population at the
-    /// youngest age in the table. Common values are:
-    /// - 100,000 (standard actuarial practice)
-    /// - 1,000,000 (for higher precision)
-    /// - 10,000,000 (for very precise calculations)
-    ///
-    /// # Example
-    /// ```rust
-    /// let config = MortTableConfig {
-    ///     // ... other fields
-    ///     l_x_init: 100_000, // Start with 100,000 lives
-    ///     // ... other fields
-    /// };
-    /// ```
+    /// Initial population size (radix). Common values: 100,000 (standard), 1,000,000 (precise).
     pub l_x_init: i32,
 
-    /// Optional percentage multiplier for mortality rates.
-    ///
-    /// Allows adjustment of base mortality rates for different populations:
-    /// - `Some(1.0)`: Use 100% of base rates (standard mortality)
-    /// - `Some(0.5)`: Use 50% of base rates (improved mortality)
-    /// - `Some(1.5)`: Use 150% of base rates (substandard mortality)
-    /// - `None`: Defaults to 100% of base rates
-    ///
-    /// Formula: $q_x^{final} = q_x^{base} \times pct$
-    ///
-    /// # Examples
-    /// ```rust
-    /// // Preferred risk class (better than standard)
-    /// let preferred = MortTableConfig {
-    ///     pct: Some(0.75), // 25% reduction in mortality
-    ///     // ... other fields
-    /// };
-    ///
-    /// // Substandard risk class
-    /// let substandard = MortTableConfig {
-    ///     pct: Some(2.0), // Double the standard mortality
-    ///     // ... other fields
-    /// };
-    /// ```
+    /// Mortality rate multiplier. Examples: 1.0 (standard), 0.75 (preferred), 1.5 (substandard).
     pub pct: Option<f64>,
 
-    /// Optional interest rate for present value calculations.
-    ///
-    /// When provided, enables calculation of commutation functions
-    /// used in life insurance and pension valuations:
-    /// - Present value factors
-    /// - Commutation functions (Cx, Dx, Mx, Nx, etc.)
-    /// - Actuarial present values
-    ///
-    /// Should be expressed as a decimal (e.g., 0.03 for 3%).
-    ///
-    /// # Examples
-    /// ```rust
-    /// let config = MortTableConfig {
-    ///     int_rate: Some(0.03), // 3% annual interest rate
-    ///     // ... other fields
-    /// };
-    /// ```
+    /// Interest rate for commutation functions (e.g., 0.03 for 3%). Required for detail levels 3+.
     pub int_rate: Option<f64>,
 
-    /// Mortality assumption for fractional age calculations.
-    ///
-    /// Determines how mortality is distributed within each age interval.
-    /// Currently reserved for future implementation of fractional age
-    /// survival and mortality probability calculations.
-    ///
-    /// # Future Use
-    /// Will be used for calculations involving:
-    /// - Fractional survival probabilities (e.g., ${}_{0.5}p_{30}$)
-    /// - Mid-year mortality adjustments
-    /// - Precise timing of deaths within age intervals
-    ///
-    /// # Examples
-    /// ```rust
-    /// let config = MortTableConfig {
-    ///     assumption: Some(AssumptionEnum::UDD), // Most common assumption
-    ///     // ... other fields
-    /// };
-    /// ```
+    /// Mortality assumption for fractional ages (reserved for future implementation).
     pub assumption: Option<AssumptionEnum>,
 }
 
 impl MortTableConfig {
-    /// Generates a complete mortality table from the configured XML data.
+    /// Generates a mortality table from the configured XML data with configurable detail level.
     ///
-    /// This method processes mortality data according to the specified configuration,
-    /// creating a comprehensive DataFrame with demographic movement functions and
-    /// optional commutation functions for actuarial calculations.
+    /// This method processes mortality data according to the specified configuration and returns a DataFrame with the requested level of detail.
     ///
-    /// # Mathematical Formulas
+    /// # Detail Levels
     ///
-    /// ## Demographic Movement Functions
-    ///
-    /// **Life Table Population**:
-    /// $$l_{x+1} = l_x - d_x = l_x \cdot (1 - q_x)$$
-    ///
-    /// **Deaths**:
-    /// $$d_x = l_x \cdot q_x$$
-    ///
-    /// ## Commutation Functions (when interest rate is provided)
-    ///
-    /// **Present Value Factor**:
-    /// $$v = \frac{1}{1+i}$$
-    ///
-    /// **Commutation Function C_x**:
-    /// $$C_x = v^{x+1} \cdot d_x = \frac{d_x}{(1+i)^{x+1}}$$
-    ///
-    /// **Commutation Function D_x**:
-    /// $$D_x = v^x \cdot l_x = \frac{l_x}{(1+i)^x}$$
-    ///
-    /// **Cumulative Functions**:
-    /// $$M_x = \sum_{k=x}^{\omega} C_k$$
-    /// $$N_x = \sum_{k=x}^{\omega} D_k$$
-    /// $$R_x = \sum_{k=x}^{\omega} M_k$$
-    /// $$S_x = \sum_{k=x}^{\omega} N_k$$
-    ///
-    /// **Probability Function**:
-    /// $$P_x = \frac{M_x}{N_x}$$
-    ///
-    /// Where:
-    /// - $x$ = age
-    /// - $i$ = interest rate
-    /// - $\omega$ = terminal age
-    /// - $q_x$ = mortality rate at age $x$
-    /// - $l_x$ = number of lives at age $x$
-    /// - $d_x$ = number of deaths between age $x$ and $x+1$
+    /// - **Level 1**: Basic mortality rates only (`age`, `qx`, `px`). Fastest, for rate analysis and validation.
+    /// - **Level 2**: Demographic functions (`age`, `qx`, `px`, `lx`, `dx`). For life table and survival analysis.
+    /// - **Level 3**: Commutation functions (all level 2 plus `Cx`, `Dx`, `Mx`, `Nx`, `Px`, `Rx`, `Sx`). For present value and custom actuarial calculations (requires `int_rate`).
+    /// - **Level 4**: Complete actuarial table (all columns, including present value and annuity functions). For insurance and pension calculations (requires `int_rate`).
     ///
     /// # Returns
     ///
-    /// Returns a `PolarsResult<DataFrame>` containing:
+    /// A `PolarsResult<DataFrame>` with columns depending on the detail level:
     ///
-    /// ## Basic Demographic Columns (always present):
-    /// - `age`: Age values (i32)
-    /// - `qx`: Mortality rates, adjusted by percentage if specified (f64)
-    /// - `lx`: Number of lives at age x (i32)
-    /// - `dx`: Number of deaths between age x and x+1 (i32)
-    ///
-    /// ## Commutation Columns (present when `int_rate` is provided):
-    /// - `Cx`: Commutation function $C_x = v^{x+1} \times d_x$ (f64)
-    /// - `Dx`: Commutation function $D_x = v^x \times l_x$ (f64)
-    /// - `Mx`: Sum of $C_x$ values from age x to terminal age (f64)
-    /// - `Nx`: Sum of $D_x$ values from age x to terminal age (f64)
-    /// - `Px`: Probability function $P_x = M_x / N_x$ (f64)
-    /// - `Rx`: Sum of $M_x$ values from age x to terminal age (f64)
-    /// - `Sx`: Sum of $N_x$ values from age x to terminal age (f64)
-    ///
-    /// # Configuration Parameters
-    ///
-    /// The method uses the following configuration from `MortTableConfig`:
-    /// - `xml`: Source mortality data (must contain exactly one table)
-    /// - `l_x_init`: Initial population at starting age (radix)
-    /// - `pct`: Optional percentage multiplier for mortality rates
-    ///   - Formula: $q_x^{adjusted} = q_x^{base} \times pct$
-    /// - `int_rate`: Optional interest rate for commutation functions
-    /// - `assumption`: Mortality assumption (UDD/CFM/HPB) - currently not used in table generation
+    /// - Level 1: `age`, `qx`, `px`
+    /// - Level 2: `age`, `qx`, `px`, `lx`, `dx`
+    /// - Level 3: All level 2 plus `Cx`, `Dx`, `Mx`, `Nx`, `Px`, `Rx`, `Sx`
+    /// - Level 4: All actuarial columns (`age`, `qx`, `px`, `lx`, `dx`, `Cx`, `Dx`, `Mx`, `Nx`, `Px`, `Rx`, `Sx`, `Ax`, `AAx`, `IAx`, `IAAx`, `ax`, `aax`, `Iax`, `Iaax`)
     ///
     /// # Examples
     ///
-    /// ## Basic mortality table without interest:
+    /// ## Level 1: Basic mortality rates only
     /// ```rust
-    /// use rslife::{MortXML, MortTableConfig};
-    ///
+    /// use rslife::prelude::*;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let xml = MortXML::from_url_id(1704)?;
     /// let config = MortTableConfig {
     ///     xml,
-    ///     l_x_init: 100_000,  // Start with 100,000 lives
-    ///     pct: Some(1.0),      // Use 100% of base rates
-    ///     int_rate: None,      // No interest rate
-    ///     assumption: None,    // No specific assumption
+    ///     l_x_init: 100_000,
+    ///     pct: Some(1.0),
+    ///     int_rate: None,
+    ///     assumption: None,
     /// };
-    ///
-    /// let mortality_table = config.gen_mort_table()?;
-    /// // Contains columns: age, qx, lx, dx
+    /// let rates_only = config.gen_mort_table(1)?;
+    /// assert!(rates_only.height() > 0);
+    /// # Ok(())
+    /// # }
     /// ```
     ///
-    /// ## Complete actuarial table with 3% interest:
+    /// ## Level 4: Complete actuarial table
     /// ```rust
+    /// use rslife::prelude::*;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let xml = MortXML::from_url_id(1704)?;
     /// let config = MortTableConfig {
     ///     xml,
     ///     l_x_init: 100_000,
-    ///     pct: Some(0.5),        // Use 50% of base mortality rates
-    ///     int_rate: Some(0.03),  // 3% interest rate
+    ///     pct: Some(1.0),
+    ///     int_rate: Some(0.03),
     ///     assumption: Some(AssumptionEnum::UDD),
     /// };
-    ///
-    /// let complete_table = config.gen_mort_table()?;
-    /// // Contains all columns including Cx, Dx, Mx, Nx, Px, Rx, Sx
+    /// let table = config.gen_mort_table(4)?;
+    /// assert!(table.height() > 0);
+    /// # Ok(())
+    /// # }
     /// ```
+    ///
+    /// # Mathematical Formulas
+    ///
+    /// - lₓ₊₁ = lₓ · (1 - qₓ)
+    /// - dₓ = lₓ · qₓ
+    /// - v = 1/(1+i)
+    /// - Cₓ = vˣ⁺¹ · dₓ
+    /// - Dₓ = vˣ · lₓ
+    /// - Mₓ = Σ(k=x to ω) Cₖ
+    /// - Nₓ = Σ(k=x to ω) Dₖ
+    /// - Rₓ = Σ(k=x to ω) Mₖ
+    /// - Sₓ = Σ(k=x to ω) Nₖ
+    /// - Pₓ = Mₓ/Nₓ
+    /// - Ax = Mₓ/Dₓ
+    /// - AAx = Ax + 1
+    /// - IAx = Rₓ/Dₓ
+    /// - IAAx = (Rₓ + Sₓ)/Dₓ
+    /// - ax = Nₓ/Dₓ - 1
+    /// - aax = Nₓ/Dₓ
+    /// - Iax = Iaax - aax
+    /// - Iaax = Sₓ/Dₓ
     ///
     /// # Errors
     ///
@@ -387,7 +154,7 @@ impl MortTableConfig {
     /// - [`MortTableConfig`] for configuration options
     /// - [`AssumptionEnum`] for mortality assumptions
     /// - [`MortXML`] for loading mortality data
-    pub fn gen_mort_table(&self) -> PolarsResult<DataFrame> {
+    pub fn gen_mort_table(&self, detail_level: i32) -> PolarsResult<DataFrame> {
         // Check if MortXML has exactly 1 table
         let tables_count = self.xml.tables.len();
 
@@ -405,44 +172,65 @@ impl MortTableConfig {
 
         let df = self.xml.tables[0].values.clone();
 
-        // When the mortality table has a 'duration' column, we need to handle it differently
+        // Push error first if 'duration' column exists, then match detail_level
         if df.column("duration").is_ok() {
-            Err(PolarsError::ComputeError(
+            return Err(PolarsError::ComputeError(
                 "Mortality table with 'duration' is not yet supported.".into(),
-            ))
-        } else {
-            gen_full_mort_table(df, self.l_x_init, self.pct, self.int_rate)
+            ));
+        }
+
+        match detail_level {
+            // Level 1: Include age,qx
+            1 => gen_rate_with_pct(df, self.pct),
+            // Level 2: Include age,mortality rates, lx, dx
+            2 => {
+                let df = gen_rate_with_pct(df, self.pct)?;
+                gen_demographic_movement(df, self.l_x_init)
+            }
+            // Level 3: Include age,mortality rates, lx, dx, Cx, Dx, Mx, Nx, Px, Rx, Sx
+            3 => {
+                // Require interest rate for detail level 3
+                if self.int_rate.is_none() {
+                    return Err(PolarsError::ComputeError(
+                        "Interest rate is required for detail level 3.".into(),
+                    ));
+                }
+
+                let df = gen_rate_with_pct(df, self.pct)?;
+                let df = gen_demographic_movement(df, self.l_x_init)?;
+                gen_commutation(df, self.int_rate.unwrap())
+            }
+            // Level 4: Include all columns from level 3 plus assurance and annuity functions (Ax, AAx, IAx, IAAx, ax, aax, Iaax, Iax)
+            4 => {
+                if self.int_rate.is_none() {
+                    return Err(PolarsError::ComputeError(
+                        "Interest rate is required for detail level 4.".into(),
+                    ));
+                }
+
+                let df = gen_rate_with_pct(df, self.pct)?;
+                let df = gen_demographic_movement(df, self.l_x_init)?;
+                let df = gen_commutation(df, self.int_rate.unwrap())?;
+                gen_assurance_annuity(df)
+            }
+            // Invalid detail level
+            _ => Err(PolarsError::ComputeError(
+                "Invalid detail level specified.".into(),
+            )),
         }
     }
 }
 
 //--------- HELPER FUNCTIONS FOR MORTALITY TABLE GENERATION ---------//
-fn gen_full_mort_table(
-    df: DataFrame,
-    l_x_init: i32,
-    pct: Option<f64>, // Percentage for the table rates values
-    int_rate: Option<f64>,
-) -> PolarsResult<DataFrame> {
-    // Apply percentage to the table rates if provided
-    let df = gen_rate_with_pct(df, pct)?;
-
-    // Generate mortality table without interest rate
-    let mut df = gen_demographic_movement(df, l_x_init)?;
-
-    // If interest rate is provided, perform commutation
-    if let Some(interest_rate) = int_rate {
-        df = gen_commutation(df, interest_rate)?;
-        df = gen_Ax_IAx(df)?;
-    }
-
-    Ok(df)
-}
-
 fn gen_rate_with_pct(df: DataFrame, pct: Option<f64>) -> PolarsResult<DataFrame> {
     // Apply percentage to the table rates if provided
     let result = df
         .lazy()
-        .with_column(col("value") * lit(pct.unwrap_or(1.0)).alias("value"))
+        .with_columns(vec![
+            (col("value") * lit(pct.unwrap_or(1.0))).alias("qx"),
+            (lit(1.0) - col("value")).alias("px"),
+        ])
+        .select(vec![col("age"), col("qx"), col("px")])
         .collect()?;
 
     Ok(result)
@@ -451,7 +239,8 @@ fn gen_rate_with_pct(df: DataFrame, pct: Option<f64>) -> PolarsResult<DataFrame>
 fn gen_demographic_movement(df: DataFrame, l_x_init: i32) -> PolarsResult<DataFrame> {
     // Calculate lx values from the mortality table
     let age = df.column("age")?.i32()?.to_vec();
-    let qx = df.column("value")?.f64()?.to_vec();
+    let qx = df.column("qx")?.f64()?.to_vec();
+    let px = df.column("px")?.f64()?.to_vec();
 
     let mut lx: Vec<i32> = Vec::with_capacity(age.len());
     let mut dx: Vec<i32> = Vec::with_capacity(age.len());
@@ -460,7 +249,7 @@ fn gen_demographic_movement(df: DataFrame, l_x_init: i32) -> PolarsResult<DataFr
 
     for i in 0..age.len() {
         let qx_val = qx[i].unwrap(); // Known that the value is always present
-                                     // lx
+        // lx
         if i > 0 {
             let lx_value = lx[i - 1] - dx[i - 1];
             lx.push(lx_value);
@@ -473,6 +262,7 @@ fn gen_demographic_movement(df: DataFrame, l_x_init: i32) -> PolarsResult<DataFr
     let result = DataFrame::new(vec![
         Series::new("age".into(), age).into_column(),
         Series::new("qx".into(), qx).into_column(),
+        Series::new("px".into(), px).into_column(),
         Series::new("lx".into(), lx).into_column(),
         Series::new("dx".into(), dx).into_column(),
     ])?;
@@ -487,6 +277,7 @@ fn gen_commutation(
 ) -> PolarsResult<DataFrame> {
     let age = df.column("age")?.i32()?.to_vec();
     let qx = df.column("qx")?.f64()?.to_vec();
+    let px = df.column("px")?.f64()?.to_vec();
     let lx = df.column("lx")?.i32()?.to_vec();
     let dx = df.column("dx")?.i32()?.to_vec();
 
@@ -499,11 +290,11 @@ fn gen_commutation(
         let lx_f64 = lx[i].unwrap() as f64;
         let dx_f64 = dx[i].unwrap() as f64;
 
-        // Cx = v^(x+1) * dx = dx / (1+i)^(x+1)
+        // Cx = vˣ⁺¹ * dx = dx / (1+i)ˣ⁺¹
         let cx_value = dx_f64 / (1.0 + int_rate).powf(age_f64 + 1.0);
         Cx.push(cx_value);
 
-        // Dx = v^x * lx = lx / (1+i)^x
+        // Dx = vˣ * lx = lx / (1+i)ˣ
         let dx_value = lx_f64 / (1.0 + int_rate).powf(age_f64);
         Dx.push(dx_value);
     }
@@ -541,6 +332,7 @@ fn gen_commutation(
     let result = DataFrame::new(vec![
         Series::new("age".into(), age).into_column(),
         Series::new("qx".into(), qx).into_column(),
+        Series::new("px".into(), px).into_column(),
         Series::new("lx".into(), lx).into_column(),
         Series::new("dx".into(), dx).into_column(),
         Series::new("Cx".into(), Cx).into_column(),
@@ -555,14 +347,20 @@ fn gen_commutation(
     Ok(result)
 }
 
-fn gen_Ax_IAx(df: DataFrame) -> PolarsResult<DataFrame> {
+fn gen_assurance_annuity(df: DataFrame) -> PolarsResult<DataFrame> {
     let lf = df
         .lazy()
         .with_columns([
-            (col("Mx") / col("Dx")).alias("Ax"),
-            (col("Mx") / col("Dx").shift(lit(-1))).alias("Ax_due"),
-            (col("Sx") / col("Dx")).alias("IAx"),
-            ((col("Sx") + col("Nx")) / col("Dx")).alias("IAx_due"),
+            (col("Mx") / col("Dx")).alias("Ax"),                 // Mₓ/Dₓ
+            (col("Mx") / col("Dx") + lit(1.0)).alias("AAx"),     // Mₓ/Dₓ + 1
+            (col("Rx") / col("Dx")).alias("IAx"),                // Rₓ/Dₓ
+            ((col("Rx") + col("Sx")) / col("Dx")).alias("IAAx"), // (Rₓ+Sₓ)/Dₓ
+            (col("Nx") / col("Dx") - lit(1.0)).alias("ax"),      // Nₓ/Dₓ - 1
+            (col("Nx") / col("Dx")).alias("aax"),                // Nₓ/Dₓ
+            (col("Sx") / col("Dx")).alias("Iaax"),               // Sₓ/Dₓ
+        ])
+        .with_columns([
+            (col("Iaax") - col("aax")).alias("Iax"), //  (Ia)ₓ = (Iä)ₓ - äₓ
         ])
         .collect()?;
     Ok(lf)
@@ -588,15 +386,15 @@ mod tests {
         };
 
         let result = config
-            .gen_mort_table()
+            .gen_mort_table(2)
             .expect("Failed to generate mortality table");
 
         // Test basic structure
         assert!(result.height() > 0, "Result DataFrame should not be empty");
-        assert_eq!(result.width(), 4, "Basic table should have 4 columns");
+        assert_eq!(result.width(), 5, "Basic table should have 5 columns");
 
         // Test column names
-        let expected_columns = vec!["age", "qx", "lx", "dx"];
+        let expected_columns = vec!["age", "qx", "px", "lx", "dx"];
         let actual_columns = result.get_column_names();
         assert_eq!(
             actual_columns, expected_columns,
@@ -642,22 +440,21 @@ mod tests {
         };
 
         let result = config
-            .gen_mort_table()
+            .gen_mort_table(3)
             .expect("Failed to generate commutation table");
 
         // Test commutation table structure
         assert!(result.height() > 0, "Result DataFrame should not be empty");
-        // The commutation table actually has 15 columns when including all computed values
+        // Level 3 should have: age, qx, px, lx, dx, Cx, Dx, Mx, Nx, Px, Rx, Sx = 12 columns
         assert_eq!(
             result.width(),
-            15,
-            "Commutation table should have 15 columns"
+            12,
+            "Commutation table should have 12 columns"
         );
 
         // Test all expected columns are present
         let expected_columns = vec![
-            "age", "qx", "lx", "dx", "Cx", "Dx", "Mx", "Nx", "Px", "Rx", "Sx", "Ax", "Ax_due",
-            "IAx", "IAx_due",
+            "age", "qx", "px", "lx", "dx", "Cx", "Dx", "Mx", "Nx", "Px", "Rx", "Sx",
         ];
         let actual_columns = result.get_column_names();
         assert_eq!(
@@ -734,9 +531,13 @@ mod tests {
             assumption: None,
         };
 
-        let table_50 = config_50.gen_mort_table().expect("Failed with 50% rates");
-        let table_100 = config_100.gen_mort_table().expect("Failed with 100% rates");
-        let table_150 = config_150.gen_mort_table().expect("Failed with 150% rates");
+        let table_50 = config_50.gen_mort_table(2).expect("Failed with 50% rates");
+        let table_100 = config_100
+            .gen_mort_table(2)
+            .expect("Failed with 100% rates");
+        let table_150 = config_150
+            .gen_mort_table(2)
+            .expect("Failed with 150% rates");
 
         // Get mortality rates at age 30 (assuming it exists)
         let qx_50 = table_50
@@ -822,7 +623,7 @@ mod tests {
             assumption: Some(AssumptionEnum::CFM),
         };
 
-        let result = config.gen_mort_table().expect("Failed to generate table");
+        let result = config.gen_mort_table(3).expect("Failed to generate table");
 
         let lx = result.column("lx").unwrap().i32().unwrap();
         let dx = result.column("dx").unwrap().i32().unwrap();
@@ -892,7 +693,7 @@ mod tests {
             };
 
             let result = config
-                .gen_mort_table()
+                .gen_mort_table(2)
                 .expect(&format!("Failed with radix {}", radix));
 
             // Test that first lx value equals the radix
@@ -918,7 +719,7 @@ mod tests {
         };
 
         // Test that valid config works
-        let result = config.gen_mort_table();
+        let result = config.gen_mort_table(2);
         assert!(result.is_ok(), "Valid config should succeed");
 
         println!("✓ Error handling tests completed");
@@ -937,7 +738,7 @@ mod tests {
         };
 
         let result = config
-            .gen_mort_table()
+            .gen_mort_table(3)
             .expect("Failed to generate comprehensive table");
 
         // Print table summary
@@ -1028,7 +829,7 @@ mod tests {
         };
 
         let result = config
-            .gen_mort_table()
+            .gen_mort_table(3)
             .expect("Failed to generate high precision table");
 
         // Test precision of calculations

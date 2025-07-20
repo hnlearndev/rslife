@@ -17,7 +17,7 @@
 //! use rslife::prelude::*;
 //!
 //! // Load mortality data from XML (using a test URL - replace with actual data)
-//! // let mort_xml = MortXML::from_url("https://mort.soa.org/ViewTable.aspx?&TableIdentity=912")?;
+//! // let mort_xml = MortXML::from_url("https://mort.soa.org/data/t1704.xml")?;
 //!
 //! // Configure mortality table with your XML data
 //! // let config = MortTableConfig {
@@ -68,19 +68,22 @@
 //! - `tAExn` - Deferred endowment insurance
 //!
 //! ### Annuities
-//! - `axn_due` - Life annuity due
-//! - `tax_due`, `taxn_due` - Deferred annuities
-//! - `Iax_due`, `Iaxn_due` - Increasing annuities
-//! - `tIax_due`, `tIaxn_due` - Deferred increasing annuities
-//! - `gIax_due`, `gIaxn_due` - Geometric increasing annuities
+//! - `aaxn` - Life annuity due
+//! - `taax`, `taaxn` - Deferred annuities
+//! - `Iaax`, `Iaaxn` - Increasing annuities
+//! - `tIaax`, `tIaaxn` - Deferred increasing annuities
+//! - `gIaax`, `gIaaxn` - Geometric increasing annuities
 //!
 //! ### Fractional Age Functions
 //! - `tpx` - Survival probability for fractional time
 //! - `tqx` - Death probability for fractional time
-//! - `conditional_tqx` - Conditional death probability
 //!
 //! All functions follow standard actuarial notation and support the three mortality assumptions.
 
 pub mod actuarial;
+pub mod fractional;
+pub mod helpers;
+pub mod mt_config;
 pub mod prelude;
+pub mod whole;
 pub mod xml;

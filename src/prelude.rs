@@ -1,63 +1,38 @@
 //! # RSLife Prelude
 //!
-//! The prelude module re-exports the most commonly used types and functions
-//! from the rslife crate, allowing users to import everything they need
-//! with a single `use` statement.
+//! Conveniently re-exports the most common types and functions for actuarial calculations.
+//! Import this module to access all primary RSLife features with a single `use` statement.
 //!
-//! ## Usage
+//! ## Example
 //!
 //! ```rust
 //! use rslife::prelude::*;
-//!
-//! // The prelude gives you access to all the main types:
-//! // - MortXML for loading mortality data
-//! // - MortTableConfig for configuring mortality tables  
-//! // - AssumptionEnum for mortality assumptions
-//! // - All actuarial functions like Ax, Axn, axn_due, etc.
+//! // Now you can use MortTableConfig, MortXML, Ax, Axn, aaxn, tpx, etc.
 //! ```
 
 // Core mortality table types and configuration
-pub use crate::actuarial::mort_tbl_config::{AssumptionEnum, MortTableConfig};
+pub use crate::mt_config::{AssumptionEnum, MortTableConfig};
 
 // XML data loading and parsing
 pub use crate::xml::{AxisDef, ContentClassification, MetaData, MortXML, Table};
 
-// All actuarial calculation functions from wholes module
-pub use crate::actuarial::wholes::{
-    // Annuities due
-    axn_due,
-    // Geometric increasing benefits
-    gAx,
-    gAxn,
-
-    gIax_due,
-    gIaxn_due,
-    tAExn,
-
-    // Deferred benefits
-    tAx,
-    tAxn,
-    tExn,
-    tIax_due,
-    tIaxn_due,
-    tax_due,
-    taxn_due,
-    AExn,
-
-    // Basic insurance benefits
-    Ax,
-    Axn,
-    Exn,
-    // Increasing benefits
-    IAx,
-    IAxn,
-
-    Iax_due,
-    Iaxn_due,
+// All actuarial calculation functions (unified interface with automatic selection)
+#[rustfmt::skip]
+pub use crate::actuarial::{
+    // Insurance Benefits (automatically optimized)
+    Ax, Axn, Exn, AExn,
+    tAx, tAxn, tExn, tAExn,
+    IAx, IAxn,
+    gAx, gAxn,
+    // Annuities (automatically optimized)
+    aaxn,
+    taax, taaxn,
+    Iaax, Iaaxn,
+    tIaax, tIaaxn,
+    gIaax, gIaaxn,
+    // Fractional calculations (already available)
+    tpx, tqx,
 };
-
-// Fractional age calculation functions
-pub use crate::actuarial::fractionals::{conditional_tqx, tpx, tqx};
 
 // Result and error types from Polars
 pub use polars::prelude::{PolarsError, PolarsResult};
