@@ -143,7 +143,7 @@ Hyperbolic interpolation:
 ## Data Sources
 
 Load mortality data from various sources:
-****
+
 ```rust
 // From SOA website (by table ID)
 let xml = MortXML::from_url_id(1704)?;****
@@ -153,14 +153,13 @@ let xml = MortXML::from_path("mortality_table.xml")?;
 
 // From URL
 let xml = MortXML::from_url("https://mort.soa.org/data/t1704.xml")?;
-```rust
+
 // From XML string
 let xml_string = r#"<MortalityTable>...</MortalityTable>"#;
 let xml = MortXML::from_string(xml_string)?;
 ```
 
 **Table IDs**: You can find mortality table IDs at [mort.soa.org](https://mort.soa.org/Default.aspx) - the first column with title "#" contains the ID numbers.
-
 
 ## Examples
 
