@@ -223,11 +223,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Trung-Hieu Nguyen** - [hieunt.hello@gmail.com](mailto:hieunt.hello@gmail.com)
 
-Project Link: [https://github.com/hnlearndev/Basic-Term-Model-Rust-lifelibBasicTermSM](https://github.com/hnlearndev/Basic-Term-Model-Rust-lifelibBasicTermSM)
+Project Link: [https://github.com/hnlearndev/Basic-Term-Model-Rust-lifelibBasicTermSM](https://github.com/hnlearndev//rslife)
 
 ## References
 
-- [Actuarial Mathematics (Bowers et al.)](https://www.soa.org/shop/actuarial-mathematics/)
+- [Actuarial Mathematics (Bowers et al.)](https://www.soa.org/shop/actuarial-mathematics)
 - [Society of Actuaries Mortality Tables](https://mort.soa.org/Default.aspx)
 - Standard actuarial notation and practices
 
