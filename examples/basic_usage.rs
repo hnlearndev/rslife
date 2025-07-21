@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create mortality table configuration
     let config = MortTableConfig {
         xml,
-        l_x_init: 100_000,
+        radix: 100_000,
         pct: Some(1.0),
         int_rate: Some(0.03),
         assumption: Some(AssumptionEnum::UDD),

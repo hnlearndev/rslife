@@ -38,7 +38,7 @@
 //! let xml = MortXML::from_url_id(912)?;
 //! let config = MortTableConfig {
 //!     xml,
-//!     l_x_init: 100_000,
+//!     radix: 100_000,
 //!     pct: Some(1.0),
 //!     int_rate: None,
 //!     assumption: Some(AssumptionEnum::UDD),
@@ -54,6 +54,7 @@
 //! # }
 //! ```
 
+use self::helpers::is_table_layout_approved;
 use super::*;
 
 /// Calculate ₜpₓ - probability of surviving t years starting at age x (fractional ages supported).
@@ -92,7 +93,7 @@ use super::*;
 /// let xml = MortXML::from_url_id(912)?;
 /// let config = MortTableConfig {
 ///     xml,
-///     l_x_init: 100_000,
+///     radix: 100_000,
 ///     pct: Some(1.0),
 ///     int_rate: None,
 ///     assumption: Some(AssumptionEnum::UDD),
@@ -117,6 +118,12 @@ use super::*;
 /// - No mortality assumption is specified for fractional calculations
 /// - Any underlying calculation fails
 pub fn tpx(config: &MortTableConfig, t: f64, x: f64) -> PolarsResult<f64> {
+    if !is_table_layout_approved(config) {
+        return Err(PolarsError::ComputeError(
+            "Mortality table XML layout is not suitable for calculations".into(),
+        ));
+    }
+
     // Handle special case for whole numbers right at the start
     if x.fract() == 0.0 && t.fract() == 0.0 {
         return whole::survivals::tpx(config, t as i32, x as i32);
@@ -163,55 +170,7 @@ pub fn tpx(config: &MortTableConfig, t: f64, x: f64) -> PolarsResult<f64> {
 
 /// Calculate ₜqₓ - probability of dying within t years starting at age x (fractional ages supported).
 ///
-/// This function computes the probability that a person aged x will die within t years,
-/// where both x and t can be fractional values. It uses the complement relationship: ₜqₓ = 1 - ₜpₓ.
-///
-/// # Arguments
-///
-/// * `config` - Mortality table configuration containing the mortality data and assumption
-/// * `t` - Time period in years (can be fractional)
-/// * `x` - Starting age (can be fractional)
-///
-/// # Returns
-///
-/// Returns `PolarsResult<f64>` containing the mortality probability (between 0.0 and 1.0).
-///
-/// # Mathematical Formula
-///
-/// ₜqₓ = 1 - ₜpₓ
-///
-/// Where ₜpₓ is calculated using the appropriate fractional age methodology based on
-/// the mortality assumption (UDD, CFM, or HPB).
-///
-/// # Examples
-///
-/// ```rust
-/// use rslife::prelude::*;
-///
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// let xml = MortXML::from_url_id(912)?;
-/// let config = MortTableConfig {
-///     xml,
-///     l_x_init: 100_000,
-///     pct: Some(1.0),
-///     int_rate: None,
-///     assumption: Some(AssumptionEnum::CFM),
-/// };
-///
-/// // 0.75-year mortality probability from age 25.5
-/// let mortality = rslife::fractional::survivals::tqx(&config, 0.75, 25.5)?;
-/// let survival = rslife::fractional::survivals::tpx(&config, 0.75, 25.5)?;
-///
-/// // Verify they sum to 1
-/// assert!((mortality + survival - 1.0).abs() < 1e-10);
-/// assert!(mortality >= 0.0 && mortality <= 1.0);
-/// # Ok(())
-/// # }
-/// ```
-///
-/// # Errors
-///
-/// Returns `PolarsError` if the underlying `tpx` calculation fails.
+/// This is the complement of [`tpx`]: ₜqₓ = 1 - ₜpₓ.
 pub fn tqx(config: &MortTableConfig, t: f64, x: f64) -> PolarsResult<f64> {
     let result = 1.0 - tpx(config, t, x)?;
     Ok(result)
@@ -230,7 +189,7 @@ mod tests {
         let xml = MortXML::from_url_id(912).expect("Failed to load XML");
         let config = MortTableConfig {
             xml,
-            l_x_init: 100_000,
+            radix: 100_000,
             pct: Some(1.0),
             int_rate: None,
             assumption: Some(AssumptionEnum::UDD),
@@ -247,7 +206,7 @@ mod tests {
         let xml = MortXML::from_url_id(912).expect("Failed to load XML");
         let config = MortTableConfig {
             xml,
-            l_x_init: 100_000,
+            radix: 100_000,
             pct: Some(1.0),
             int_rate: None,
             assumption: Some(AssumptionEnum::UDD),
@@ -264,15 +223,15 @@ mod tests {
         let xml = MortXML::from_url_id(912).expect("Failed to load XML");
         let config = MortTableConfig {
             xml,
-            l_x_init: 100_000,
+            radix: 100_000,
             pct: Some(1.0),
             int_rate: None,
             assumption: Some(AssumptionEnum::UDD),
         };
 
         // Test fractional age: ₁p₃₀.₂₅
-        let survival_prob = tpx(&config, 1.0, 30.25).unwrap();
-        println!("UDD: ₁p₃₀.₂₅ = {:.6}", survival_prob);
+        let survival_prob = tpx(&config, 1.5, 30.25).unwrap();
+        println!("UDD: ₁.₅p₃₀.₂₅ = {:.6}", survival_prob);
         assert!(survival_prob > 0.0 && survival_prob <= 1.0);
     }
 
@@ -281,7 +240,7 @@ mod tests {
         let xml = MortXML::from_url_id(912).expect("Failed to load XML");
         let config = MortTableConfig {
             xml,
-            l_x_init: 100_000,
+            radix: 100_000,
             pct: Some(1.0),
             int_rate: None,
             assumption: Some(AssumptionEnum::UDD),
@@ -298,7 +257,7 @@ mod tests {
         let xml = MortXML::from_url_id(912).expect("Failed to load XML");
         let config = MortTableConfig {
             xml,
-            l_x_init: 100_000,
+            radix: 100_000,
             pct: Some(1.0),
             int_rate: None,
             assumption: Some(AssumptionEnum::UDD),
@@ -322,7 +281,7 @@ mod tests {
         // Test with 50% of base rates
         let config_50 = MortTableConfig {
             xml: xml.clone(),
-            l_x_init: 100_000,
+            radix: 100_000,
             pct: Some(0.5),
             int_rate: None,
             assumption: Some(AssumptionEnum::UDD),
@@ -331,7 +290,7 @@ mod tests {
         // Test with 100% of base rates
         let config_100 = MortTableConfig {
             xml,
-            l_x_init: 100_000,
+            radix: 100_000,
             pct: Some(1.0),
             int_rate: None,
             assumption: Some(AssumptionEnum::UDD),
@@ -352,7 +311,7 @@ mod tests {
         let xml = MortXML::from_url_id(912).expect("Failed to load XML");
         let config = MortTableConfig {
             xml,
-            l_x_init: 100_000,
+            radix: 100_000,
             pct: Some(1.0),
             int_rate: None,
             assumption: Some(AssumptionEnum::CFM),
@@ -374,7 +333,7 @@ mod tests {
         let xml = MortXML::from_url_id(912).expect("Failed to load XML");
         let config = MortTableConfig {
             xml,
-            l_x_init: 100_000,
+            radix: 100_000,
             pct: Some(1.0),
             int_rate: None,
             assumption: Some(AssumptionEnum::HPB),
@@ -397,7 +356,7 @@ mod tests {
 
         let config_udd = MortTableConfig {
             xml: xml.clone(),
-            l_x_init: 100_000,
+            radix: 100_000,
             pct: Some(1.0),
             int_rate: None,
             assumption: Some(AssumptionEnum::UDD),
@@ -405,7 +364,7 @@ mod tests {
 
         let config_cfm = MortTableConfig {
             xml: xml.clone(),
-            l_x_init: 100_000,
+            radix: 100_000,
             pct: Some(1.0),
             int_rate: None,
             assumption: Some(AssumptionEnum::CFM),
@@ -413,7 +372,7 @@ mod tests {
 
         let config_hpb = MortTableConfig {
             xml,
-            l_x_init: 100_000,
+            radix: 100_000,
             pct: Some(1.0),
             int_rate: None,
             assumption: Some(AssumptionEnum::HPB),
@@ -448,7 +407,7 @@ mod tests {
         let xml = MortXML::from_url_id(912).expect("Failed to load XML");
         let config = MortTableConfig {
             xml,
-            l_x_init: 100_000,
+            radix: 100_000,
             pct: Some(1.0),
             int_rate: None,
             assumption: Some(AssumptionEnum::UDD),
@@ -457,7 +416,7 @@ mod tests {
         // Test unsupported assumption
         let config_invalid = MortTableConfig {
             xml: config.xml.clone(),
-            l_x_init: 100_000,
+            radix: 100_000,
             pct: Some(1.0),
             int_rate: None,
             assumption: None, // No assumption specified

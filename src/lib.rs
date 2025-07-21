@@ -22,7 +22,7 @@
 //! // Configure mortality table with your XML data
 //! // let config = MortTableConfig {
 //! //     xml: mort_xml,
-//! //     l_x_init: 100_000,
+//! //     radix: 100_000,
 //! //     pct: Some(1.0),
 //! //     int_rate: Some(0.03),
 //! //     assumption: Some(AssumptionEnum::UDD),
@@ -78,12 +78,16 @@
 //! - `tpx` - Survival probability for fractional time
 //! - `tqx` - Death probability for fractional time
 //!
+//! ### Select and Ultimate Functions
+//! - `tpx_` - Survival probability with entry age selection
+//! - `tqx_` - Death probability with entry age selection
+//!
 //! All functions follow standard actuarial notation and support the three mortality assumptions.
 
-pub mod actuarial;
 pub mod fractional;
 pub mod helpers;
 pub mod mt_config;
 pub mod prelude;
+pub mod selection;
 pub mod whole;
 pub mod xml;

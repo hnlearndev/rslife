@@ -31,7 +31,7 @@
 //! let xml = MortXML::from_url_id(1704)?;
 //! let config = MortTableConfig {
 //!     xml,
-//!     l_x_init: 100_000,
+//!     radix: 100_000,
 //!     pct: Some(1.0),
 //!     int_rate: None,
 //!     assumption: None,
@@ -77,7 +77,7 @@ use super::*;
 /// let xml = MortXML::from_url_id(1704)?;
 /// let config = MortTableConfig {
 ///     xml,
-///     l_x_init: 100_000,
+///     radix: 100_000,
 ///     pct: Some(1.0),
 ///     int_rate: None,
 ///     assumption: None,
@@ -97,66 +97,23 @@ use super::*;
 /// - The specified age is not found in the mortality table
 /// - Any underlying calculation fails
 pub fn tpx(config: &MortTableConfig, t: i32, x: i32) -> PolarsResult<f64> {
-    let mut tpx = 1.0;
+    let mut result = 1.0;
 
     for age in x..(x + t) {
         let qx = get_value(config, age, "qx")?;
         let px = 1.0 - qx;
-        tpx *= px;
+        result *= px;
     }
 
-    Ok(tpx)
+    Ok(result)
 }
 
-/// Calculate ₜqₓ - probability of dying within t years starting at age x (whole ages only).
+/// Calculate ₜqₓ - probability of dying within t years starting at age x (fractional ages supported).
 ///
-/// This function computes the probability that a person aged x will die within t years.
-/// It uses the complement relationship: ₜqₓ = 1 - ₜpₓ.
-///
-/// # Arguments
-///
-/// * `config` - Mortality table configuration containing the mortality data
-/// * `t` - Time period in years (must be a positive integer)
-/// * `x` - Starting age (must be a positive integer)
-///
-/// # Returns
-///
-/// Returns `PolarsResult<f64>` containing the mortality probability (between 0.0 and 1.0).
-///
-/// # Mathematical Formula
-///
-/// ₜqₓ = 1 - ₜpₓ = 1 - ∏(k=0 to t-1) (1 - qₓ₊ₖ)
-///
-/// # Examples
-///
-/// ```rust
-/// use rslife::prelude::*;
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// let xml = MortXML::from_url_id(1704)?;
-/// let config = MortTableConfig {
-///     xml,
-///     l_x_init: 100_000,
-///     pct: Some(1.0),
-///     int_rate: None,
-///     assumption: None,
-/// };
-///
-/// // 5-year mortality probability from age 60
-/// let mortality = rslife::whole::survivals::tqx(&config, 5, 60)?;
-/// let survival = rslife::whole::survivals::tpx(&config, 5, 60)?;
-///
-/// // Verify they sum to 1
-/// assert!((mortality + survival - 1.0).abs() < 1e-10);
-/// # Ok(())
-/// # }
-/// ```
-///
-/// # Errors
-///
-/// Returns `PolarsError` if the underlying `tpx` calculation fails.
+/// This is the complement of [`tpx`]: ₜqₓ = 1 - ₜpₓ.
 pub fn tqx(config: &MortTableConfig, t: i32, x: i32) -> PolarsResult<f64> {
-    let tpx = tpx(config, t, x)?;
-    Ok(1.0 - tpx)
+    let result = 1.0 - tpx(config, t, x)?;
+    Ok(result)
 }
 
 //-----------------------------------------------------------
@@ -173,7 +130,7 @@ mod tests {
         let xml = MortXML::from_url_id(1704).expect("Failed to load XML");
         let config = MortTableConfig {
             xml,
-            l_x_init: 100_000,
+            radix: 100_000,
             pct: Some(1.0),
             int_rate: None,
             assumption: None,
@@ -187,7 +144,7 @@ mod tests {
         let xml = MortXML::from_url_id(1704).expect("Failed to load XML");
         let config = MortTableConfig {
             xml,
-            l_x_init: 100_000,
+            radix: 100_000,
             pct: Some(1.0),
             int_rate: None,
             assumption: None,

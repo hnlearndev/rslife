@@ -1,5 +1,5 @@
 #![allow(non_snake_case)]
-
+use self::helpers::get_new_config;
 use super::*;
 
 /// # Annuities Module
@@ -22,7 +22,7 @@ use super::*;
 /// let xml = MortXML::from_url_id(1704)?;
 /// let config = MortTableConfig {
 ///     xml,
-///     l_x_init: 100_000,
+///     radix: 100_000,
 ///     pct: Some(1.0),
 ///     int_rate: Some(0.03),
 ///     assumption: Some(AssumptionEnum::UDD),
@@ -33,31 +33,59 @@ use super::*;
 /// # Ok(())
 /// # }
 /// ```
-/// Life annuity-due with m payments per year: äₓ⁽ᵐ⁾ = (1/m) × [Nₓ/Dₓ - (m-1)/(2m)]
-fn aax(config: &MortTableConfig, x: i32, m: i32) -> PolarsResult<f64> {
-    let nx = get_value(config, x, "Nx")?;
-    let dx = get_value(config, x, "Dx")?;
-    let ax = nx / dx;
-    let correction = (m as f64 - 1.0) / (2.0 * m as f64);
-    Ok((1.0 / m as f64) * (ax - correction))
+
+//--------------------------Immediate-------------------------------
+//-----------------Basic------------------
+
+/// Due life annuity-due:
+/// äₓ⁽ᵐ⁾ = (1/m) × [(1 - vˣ)/(1 - v¹/ᵐ)]
+///
+/// Present value of 1/m paid m times per year for life, starting immediately.
+fn aa_x(config: &MortTableConfig, x: i32, m: i32) -> PolarsResult<f64> {
+    let i = config.int_rate.unwrap_or(0.0);
+    let v = 1.0 / (1.0 + i);
+    let numerator = 1.0 - v.powi(x);
+    let denominator = 1.0 - v.powf(1.0 / m as f64);
+    let result = (1.0 / m as f64) * (numerator / denominator);
+    Ok(result)
 }
 
-/// Temporary annuity-due: äₓ:ₙ⁽ᵐ⁾ = (1/m) × [(Nₓ - Nₓ₊ₙ)/Dₓ - (m-1)/(2m) × (1 - Dₓ₊ₙ/Dₓ)]
+/// Due temporary annuity-due:
+/// äₓ:ₙ̅⁽ᵐ⁾ = äₓ₊ₙ̅⁽ᵐ⁾ - äₓ⁽ᵐ⁾
 ///
 /// Present value of 1/m paid m times per year for at most n years.
-pub fn aaxn(config: &MortTableConfig, x: i32, n: i32, m: i32) -> PolarsResult<f64> {
-    let dx = get_value(config, x, "Dx")?;
-    let dxn = get_value(config, x + n, "Dx")?;
-    let nx = get_value(config, x, "Nx")?;
-    let nxn = get_value(config, x + n, "Nx")?;
-    let annuity = (nx - nxn) / dx;
-    let correction = ((m as f64 - 1.0) / (2.0 * m as f64)) * (1.0 - dxn / dx);
-    Ok((1.0 / m as f64) * (annuity - correction))
+pub fn aa_x_n(config: &MortTableConfig, x: i32, n: i32, m: i32) -> PolarsResult<f64> {
+    let result = aa_x(config, x, m)? - aa_x(config, x + n, m)?;
+    Ok(result)
+}
+
+//-----------------Increasing------------------
+/// Due life annuity-due:
+/// Iäₓ⁽ᵐ⁾ = (äₓ⁽ᵐ⁾ + Aₓ) / (d⁽ᵐ⁾)² where d⁽ᵐ⁾ = m[1 - (1+i)⁻¹/ᵐ]
+///
+/// Present value of 1/m paid m times per year for life, starting immediately.
+fn Iaa_x(config: &MortTableConfig, x: i32, m: i32) -> PolarsResult<f64> {
+    let i = config.int_rate.unwrap_or(0.0);
+    let m_f = m as f64;
+    let d_m = m_f * (1.0 - (1.0 + i).powf(-1.0 / m_f));
+    let aax_m = aa_x(config, x, m)?; // äₓ⁽ᵐ⁾
+    let ax = get_value(config, x, "Ax")?; // Aₓ
+    let result = (aax_m + ax) / (d_m * d_m);
+    Ok(result)
+}
+
+/// Due temporary annuity-due:
+/// äₓ:ₙ̅⁽ᵐ⁾ = äₓ₊ₙ̅⁽ᵐ⁾ - äₓ⁽ᵐ⁾
+///
+/// Present value of 1/m paid m times per year for at most n years.
+pub fn Iaa_x_n(config: &MortTableConfig, x: i32, n: i32, m: i32) -> PolarsResult<f64> {
+    let result = aa_x(config, x, m)? - aa_x(config, x + n, m)?;
+    Ok(result)
 }
 
 //------------------- Deferred Annuities -------------------
 
-/// Deferred life annuity-due: ₜäₓ⁽ᵐ⁾ = (Dₓ₊ₜ/Dₓ) × äₓ₊ₜ⁽ᵐ⁾
+/// Immediate deferred life annuity-due: ₜäₓ⁽ᵐ⁾ = (Dₓ₊ₜ⁽ⁱ⁾/Dₓ⁽ⁱ⁾) × äₓ₊ₜ⁽ᵐ⁾
 ///
 /// Annuity beginning after t-year deferral period.
 pub fn taax(config: &MortTableConfig, x: i32, t: i32, m: i32) -> PolarsResult<f64> {
@@ -67,7 +95,7 @@ pub fn taax(config: &MortTableConfig, x: i32, t: i32, m: i32) -> PolarsResult<f6
     Ok((dxh / dx) * ax_due_h)
 }
 
-/// Deferred temporary annuity: ₜäₓ:ₙ⁽ᵐ⁾ = ₜäₓ⁽ᵐ⁾ - ₜ₊ₙäₓ⁽ᵐ⁾
+/// Immediate deferred temporary annuity: ₜäₓ:ₙ⁽ᵐ⁾ = ₜäₓ⁽ᵐ⁾ - ₜ₊ₙäₓ⁽ᵐ⁾
 ///
 /// Annuity with both deferral period t and payment period n.
 pub fn taaxn(config: &MortTableConfig, x: i32, n: i32, t: i32, m: i32) -> PolarsResult<f64> {
@@ -78,7 +106,7 @@ pub fn taaxn(config: &MortTableConfig, x: i32, n: i32, t: i32, m: i32) -> Polars
 
 //------------------- Increasing Annuities -------------------
 
-/// Increasing life annuity: (Iä)ₓ⁽ᵐ⁾ = (1/m) × [(3-m)(Sₓ + Nₓ) - (m-1)Dₓ] / (2Dₓ)
+/// Immediate increasing life annuity: (Iä)ₓ⁽ᵐ⁾ = (1/m) × [(3-m)(Sₓ⁽ⁱ⁾ + Nₓ⁽ⁱ⁾) - (m-1)Dₓ⁽ⁱ⁾] / (2Dₓ⁽ⁱ⁾)
 ///
 /// Payments increase by 1/m each year: 1/m, 2/m, 3/m, ...
 pub fn Iaax(config: &MortTableConfig, x: i32, _n: i32, m: i32) -> PolarsResult<f64> {
@@ -90,7 +118,9 @@ pub fn Iaax(config: &MortTableConfig, x: i32, _n: i32, m: i32) -> PolarsResult<f
     Ok((1.0 / m as f64) * (numerator / denominator))
 }
 
-/// Increasing temporary annuity: (Iä)ₓ:ₙ⁽ᵐ⁾ = (Iä)ₓ⁽ᵐ⁾ - (Dₓ₊ₙ/Dₓ) × (Iä)ₓ₊ₙ⁽ᵐ⁾
+/// Immediate increasing temporary annuity: (Iä)ₓ:ₙ⁽ᵐ⁾ = (Iä)ₓ⁽ᵐ⁾ - (Dₓ₊ₙ⁽ⁱ⁾/Dₓ⁽ⁱ⁾) × (Iä)ₓ₊ₙ⁽ᵐ⁾
+///
+/// Increasing payments for at most n years.
 pub fn Iaaxn(config: &MortTableConfig, x: i32, n: i32, m: i32) -> PolarsResult<f64> {
     let iax = Iaax(config, x, n, m)?;
     let dx = get_value(config, x, "Dx")?;
@@ -99,7 +129,9 @@ pub fn Iaaxn(config: &MortTableConfig, x: i32, n: i32, m: i32) -> PolarsResult<f
     Ok(iax - (dxn / dx) * iax_n)
 }
 
-/// Deferred increasing annuity: ₜ|(Iä)ₓ⁽ᵐ⁾ = (Dₓ₊ₜ/Dₓ) × (Iä)ₓ₊ₜ⁽ᵐ⁾
+/// Immediate deferred increasing annuity: ₜ|(Iä)ₓ⁽ᵐ⁾ = (Dₓ₊ₜ⁽ⁱ⁾/Dₓ⁽ⁱ⁾) × (Iä)ₓ₊ₜ⁽ᵐ⁾
+///
+/// Increasing annuity beginning after t-year deferral period.
 pub fn tIaax(config: &MortTableConfig, x: i32, _n: i32, t: i32, m: i32) -> PolarsResult<f64> {
     let dx = get_value(config, x, "Dx")?;
     let dx_t = get_value(config, x + t, "Dx")?;
@@ -107,7 +139,9 @@ pub fn tIaax(config: &MortTableConfig, x: i32, _n: i32, t: i32, m: i32) -> Polar
     Ok((dx_t / dx) * iax_due_t)
 }
 
-/// Deferred increasing temporary annuity: ₜ|(Iä)ₓ:ₙ⁽ᵐ⁾ = ₜ|(Iä)ₓ⁽ᵐ⁾ - ₜ₊ₙ|(Iä)ₓ⁽ᵐ⁾
+/// Immediate deferred increasing temporary annuity: ₜ|(Iä)ₓ:ₙ⁽ᵐ⁾ = ₜ|(Iä)ₓ⁽ᵐ⁾ - ₜ₊ₙ|(Iä)ₓ⁽ᵐ⁾
+///
+/// Increasing annuity with both deferral period t and payment period n.
 pub fn tIaaxn(config: &MortTableConfig, x: i32, n: i32, t: i32, m: i32) -> PolarsResult<f64> {
     let t_iax_due = tIaax(config, x, n, t, m)?;
     let t_iax_due_n = tIaax(config, x, n, t + n, m)?;
@@ -133,7 +167,9 @@ pub fn gIaax(config: &MortTableConfig, x: i32, n: i32, m: i32, g: f64) -> Polars
     Ok(result)
 }
 
-/// Geometric increasing temporary annuity: (gIä)ₓ:ₙ⁽ᵐ⁾ with adjusted interest rate i′ = (1+i)/(1+g) - 1
+/// Immediate geometric increasing temporary annuity: (gIä)ₓ:ₙ⁽ᵐ⁾ with adjusted interest rate i′ = (1+i)/(1+g) - 1
+///
+/// Increasing temporary annuity with geometric growth rate g.
 pub fn gIaaxn(config: &MortTableConfig, x: i32, n: i32, m: i32, g: f64) -> PolarsResult<f64> {
     let new_config = get_new_config(config, g);
     let result = Iaaxn(&new_config, x, n, m)?;

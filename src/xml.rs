@@ -676,6 +676,15 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_xml_selection_table() {
+        // Show the structure of table with selection effect
+        let mort_xml = MortXML::from_url_id(47).unwrap();
+        let df = &mort_xml.tables[0].values;
+        println!("DataFrame: {:?}", df.head(Some(10)));
+        assert!(df.height() > 0, "DataFrame is empty");
+    }
+
+    #[test]
     fn test_xml_from_url_id() {
         // This will call the MortXML::from_url method as well
         let result = MortXML::from_url_id(912);
@@ -707,8 +716,8 @@ mod tests {
     #[ignore]
     fn test_xml_from_id() {
         // This will call the MortXML::from_string method as well
-        let result = MortXML::from_id(912);
-        assert!(result.is_ok(), "Failed to load MortXML from id 912");
+        let result = MortXML::from_id(1704);
+        assert!(result.is_ok(), "Failed to load MortXML from id 1704");
 
         let mort_xml = result.unwrap();
         assert!(mort_xml.tables.len() > 0, "No tables loaded from ID");

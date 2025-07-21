@@ -20,7 +20,7 @@
 //!     let xml = MortXML::from_url_id(1704)?;
 //!     let config = MortTableConfig {
 //!         xml,
-//!         l_x_init: 100_000,
+//!         radix: 100_000,
 //!         pct: Some(1.0),
 //!         int_rate: Some(0.03),
 //!         assumption: Some(AssumptionEnum::UDD),
@@ -35,10 +35,13 @@
 //! - **[`crate::actuarial`]** - Primary user interface with full documentation
 //! - **[`survivals`]** - Fractional survival and mortality calculations
 
+// Define module structure
 pub mod annuities;
 pub mod benefits;
+mod helpers;
 pub mod survivals;
 
+// Common imports for fractional calculations
 use crate::helpers::get_value;
 use crate::mt_config::{AssumptionEnum, MortTableConfig};
 use crate::whole;

@@ -39,7 +39,7 @@ fn main() -> PolarsResult<()> {
     // Configure mortality table
     let config = MortTableConfig {
         xml,
-        l_x_init: 100_000,
+        radix: 100_000,
         pct: Some(1.0),
         int_rate: Some(0.03),
         assumption: Some(AssumptionEnum::UDD),
@@ -62,12 +62,10 @@ fn main() -> PolarsResult<()> {
 
 ## Performance Optimization
 
-RSLife automatically optimizes performance with a 4-level detail system:
+RSLife automatically optimizes performance with a 2-level detail system:
 
-- **Level 1** (~10x faster): Basic mortality rates (`qx`, `px`)
-- **Level 2** (~5x faster): Demographics (`lx`, `dx`)
-- **Level 3** (~2x faster): Commutation functions (`Dx`, `Nx`, etc.)
-- **Level 4** (complete): All actuarial functions (`Ax`, `äx`, etc.)
+- **Level 1** (~2x faster): Basic demographic functions (`qx`, `px`, `lx`, `dx`) - for life table analysis
+- **Level 2** (complete): All commutation functions (`Dx`, `Nx`, `Cx`, `Mx`, etc.) - for actuarial calculations
 
 Functions automatically use the minimum required level for optimal performance.
 
@@ -99,46 +97,101 @@ Hyperbolic interpolation:
 ₜpₓ = (1 - qₓ) / (1 - (1-t) · qₓ)
 ```
 
-## Key Functions
+## Actuarial Functions & Naming Convention
 
-### Life Insurance
+The library provides comprehensive actuarial functions following a systematic naming convention, as illustrated below:
 
-- `Ax(config, x)` - Whole life insurance
-- `Axn(config, x, n)` - Term insurance
-- `Exn(config, x, n)` - Pure endowment
-- `AExn(config, x, n)` - Endowment
-- `IAx(config, x)` - Increasing whole life
-- `IAxn(config, x, n)` - Increasing term insurance
-- `gAx(config, x, g)` - Geometric increasing whole life
-- `gAxn(config, x, n, g)` - Geometric increasing term insurance
+![Function Naming Convention](diagrams/function_convention-benefits.drawio.gif)
 
-### Deferred Insurance
+![Function Naming Convention](diagrams/function_convention-annuities.drawio.gif)
 
-- `tAx(config, x, t)` - Deferred whole life insurance
-- `tAxn(config, x, t, n)` - Deferred term insurance
-- `tExn(config, x, t, n)` - Deferred pure endowment
-- `tAExn(config, x, t, n)` - Deferred endowment
+```mermaid
+graph TD
+    A["Base Functions<br/>(immediate)"] --> B["Due Payments<br/>(start of period)"]
+    A --> C["Increasing Benefits<br/>(arithmetic growth)"]
+    A --> D["Geometric Benefits<br/>(geometric growth)"]
+    A --> E["Deferred Benefits<br/>(delayed start)"]
+
+    B --> F["Increasing Due<br/>(due + increasing)"]
+    B --> G["Geometric Due<br/>(due + geometric)"]
+    B --> H["Deferred Due<br/>(deferred + due)"]
+
+    C --> I["Increasing Deferred<br/>(deferred + increasing)"]
+    D --> J["Geometric Deferred<br/>(deferred + geometric)"]
+
+    F --> K["Complex Combinations<br/>(all modifiers)"]
+    G --> K
+
+    style A fill:#e1f5fe
+    style B fill:#f3e5f5
+    style C fill:#e8f5e8
+    style D fill:#fff3e0
+    style E fill:#fce4ec
+    style F fill:#f1f8e9
+    style G fill:#fef7e0
+    style H fill:#e8eaf6
+    style I fill:#e0f2f1
+    style J fill:#fff8e1
+    style K fill:#ffebee
+```
+
+### Insurance Benefits
+
+**Core Functions**: `A_x` (whole life), `A_x1_n` (term), `A_x_n1` (deferred), `A_x_n` (endowment)
+
+**Systematic Modifiers**:
+
+- **Due**: `AA_x` (premiums at period start)
+- **Increasing**: `IA_x` (arithmetic benefit growth)
+- **Geometric**: `gA_x` (geometric benefit growth)
+- **Deferred**: `t_A_x` (delayed benefit start)
 
 ### Annuities
 
-- `aax(config, x, m)` - Life annuity due with m payable
-- `aaxn(config, x, n, m)` - Life temporary annuity due with m payable
-- `Iaax(config, x, n, m)` - Increasing annuity with m payable
-- `Iaaxn(config, x, n, m)` - Increasing temporary annuity with m payable
-- `gIaax(config, x, n, m, g)` - Geometric increasing annuity with m payable
-- `gIaaxn(config, x, n, m, g)` - Geometric increasing temporary annuity with m payable
+**Core Functions**: `aa_x_n` (life due), `a_x_n` (immediate), with systematic parallel naming
 
-### Deferred Annuities
+**Examples**: `t_aa_x` (deferred), `Iaa_x` (increasing), `gIaa_x` (geometric increasing)
 
-- `taax(config, x, t, m)` - Deferred annuity with m payable
-- `taaxn(config, x, t, n, m)` - Deferred temporary annuity with m payable
-- `tIaax(config, x, n, t, m)` - Deferred increasing annuity with m payable
-- `tIaaxn(config, x, n, t, m)` - Deferred increasing temporary annuity with m payable
+### Survival Functions
 
-  ### Survival Functions
+**Core Functions**: `tpx(config, t, x)`, `tqx(config, t, x)` - survival and death probability functions
 
-- `tpx(config, t, x)` - Survival probability for t years
-- `tqx(config, t, x)` - Death probability within t years
+**Fractional Age Support**: All survival functions support fractional ages and time periods with three mortality assumptions:
+
+- **UDD (Uniform Distribution of Deaths)**: `tpx(&config, 2.5, 35.3)` - linear interpolation
+- **CFM (Constant Force of Mortality)**: Exponential survival model for fractional periods
+- **HPB (Hyperbolic/Balmer)**: Hyperbolic interpolation between integer ages
+
+**Key Features**:
+
+- Full fractional age calculations (e.g., age 35.3, time period 2.5 years)
+- Automatic assumption selection based on `MortTableConfig.assumption`
+- Consistent behavior across all mortality calculation functions
+
+### Selection Functions
+
+**Selection Functions**: All actuarial functions (insurance, annuities, and survival) have corresponding selection variants with a `_` suffix:
+
+- **Insurance**: `A_x_(config, entry_age, x)`, `AA_x_(config, entry_age, x)`, `IA_x_(config, entry_age, x)`, etc.
+- **Annuities**: `aa_x_n_(config, entry_age, x, n)`, `Iaa_x_(config, entry_age, x)`, `gaa_x_n_(config, entry_age, x, n)`, etc.
+- **Survival**: `tpx_(config, entry_age, t, x)`, `tqx_(config, entry_age, t, x)`
+
+**Key Differences**:
+
+- **Additional Parameter**: Selection functions require an `entry_age` parameter in addition to the standard parameters
+- **Signature**: `function_(config, entry_age, ...other_params)` vs `function(config, ...params)`
+- **Purpose**: Handle select mortality tables where mortality rates depend on both current age and time since policy issue
+
+**Design Rationale**: Selection functions use a separate namespace (with `_` suffix) rather than being integrated into the main functions because:
+
+1. **Rare Usage**: Select mortality tables are encountered infrequently in practice
+2. **Explicit Intent**: When selection effects are relevant, it's better to make this explicit through distinct function names
+3. **Parameter Clarity**: The additional `entry_age` parameter makes the selection context immediately apparent
+4. **API Simplicity**: Keeps the main function signatures clean for the common non-select case
+
+This design choice prioritizes clarity and intentionality over API unification, ensuring that when selection effects matter, developers are explicitly aware of using specialized functionality.
+
+This systematic approach provides 48+ actuarial functions with consistent naming across insurance, annuities, and survival calculations.
 
 ## Data Sources
 

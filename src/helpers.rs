@@ -60,7 +60,7 @@ use polars::prelude::*;
 ///     let xml = MortXML::from_url_id(1704)?;
 ///     let config = MortTableConfig {
 ///         xml,
-///         l_x_init: 100_000,
+///         radix: 100_000,
 ///         pct: Some(1.0),
 ///         int_rate: Some(0.03),
 ///         assumption: Some(AssumptionEnum::UDD),
@@ -80,23 +80,23 @@ pub fn get_value(config: &MortTableConfig, x: i32, column_name: &str) -> PolarsR
     // Determine the minimum detail level required for this column
     let detail_level = match column_name {
         // Level 1: Basic mortality rates
-        "qx" | "px" => 1,
+        "qx" | "px" | "lx" | "dx" => 1,
         // Level 2: Demographics and basic calculations
-        "lx" | "dx" => 2,
-        // Level 3: Full commutation functions
-        "Cx" | "Dx" | "Mx" | "Nx" | "Px" | "Rx" | "Sx" => 3,
-        // Level 4: Assurance and annuity values
-        "Ax" | "AAx" | "IAx" | "IAAx" | "ax" | "aax" | "Iax" | "Iaax" => 4,
+        "Cx" | "Dx" => 2,
+        // Level 3: Assurance and annuity values
+        "Mx" | "Nx" | "Px" => 3,
+        // Level 4: Full actuarial values
+        "Rx" | "Sx" => 4,
         // Return error for unknown columns
         _ => {
             return Err(PolarsError::ComputeError(
                 format!(
-                    r#"Unknown column name: '{column_name}'.
-                    Supported columns are:
-                    Level 1: qx, px
-                    Level 2: lx, dx
-                    Level 3: Cx, Dx, Mx, Nx, Px, Rx, Sx
-                    Level 4: Ax, AAx, IAx, IAAx, ax, aax, Iax, Iaax"#
+                    "Unknown column name: '{column_name}'. \
+                    Supported columns: \
+                    Level 1: qx, px, lx, dx; \
+                    Level 2: Cx, Dx; \
+                    Level 3: Mx, Nx, Px; \
+                    Level 4: Rx, Sx, Ax, AAx, IAx, IAAx, ax, aax, Iax, Iaax."
                 )
                 .into(),
             ));
@@ -114,34 +114,9 @@ pub fn get_value(config: &MortTableConfig, x: i32, column_name: &str) -> PolarsR
     let column = df.column(column_name).unwrap();
 
     let value = match column_name {
-        "lx" | "dx" => column.i32().unwrap().get(0).map(|v| v as f64).unwrap(),
-        _ => column.f64().unwrap().get(0).unwrap(),
+        "lx" | "dx" => column.i32()?.get(0).map(|v| v as f64).unwrap(),
+        _ => column.f64()?.get(0).unwrap(),
     };
 
     Ok(value)
-}
-
-/// Creates a new configuration with adjusted interest rate for geometric growth calculations.
-///
-/// **Mathematical Formula**: i′ = (1+i)/(1+g) - 1
-///
-/// This adjustment allows geometric growth calculations to be performed using
-/// standard actuarial functions with the modified interest rate.
-///
-/// # Parameters
-/// - `config`: Original mortality table configuration
-/// - `g`: Growth rate for geometric calculations
-///
-/// # Returns
-/// New configuration with adjusted interest rate
-pub fn get_new_config(config: &MortTableConfig, g: f64) -> MortTableConfig {
-    let i = config.int_rate.unwrap();
-    let int_rate = (1.0 + i) / (1.0 + g) - 1.0;
-    MortTableConfig {
-        int_rate: Some(int_rate),
-        xml: config.xml.clone(),
-        l_x_init: config.l_x_init,
-        pct: config.pct,
-        assumption: config.assumption,
-    }
 }
