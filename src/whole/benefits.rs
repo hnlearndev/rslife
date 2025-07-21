@@ -34,7 +34,7 @@ use super::*;
 /// # Ok(())
 /// # }
 /// ```
-
+///
 /// Whole life insurance: Aₓ = Mₓ/Dₓ
 ///
 /// Present value of $1 paid at death, regardless of when death occurs.

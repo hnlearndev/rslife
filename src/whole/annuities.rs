@@ -33,7 +33,6 @@ use super::*;
 /// # Ok(())
 /// # }
 /// ```
-
 /// Life annuity-due with m payments per year: äₓ⁽ᵐ⁾ = (1/m) × [Nₓ/Dₓ - (m-1)/(2m)]
 fn aax(config: &MortTableConfig, x: i32, m: i32) -> PolarsResult<f64> {
     let nx = get_value(config, x, "Nx")?;
