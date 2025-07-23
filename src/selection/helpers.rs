@@ -1,48 +1,38 @@
 use super::*;
 
-pub fn is_table_layout_approved(config: &MortTableConfig) -> bool {
+pub fn get_new_config_with_selected_table(
+    config: &MortTableConfig,
+    entry_age: i32,
+) -> PolarsResult<MortTableConfig> {
+    if !_is_table_layout_approved(config) {
+        return Err(PolarsError::InvalidOperation(
+            "Mortality table layout is not approved".into(),
+        ));
+    }
+
+    let selected_df = _get_selected_mortality_table(config, entry_age)?;
+
+    // Create a new MortTableConfig with the modified DataFrame
+    let mut new_config = config.clone();
+    new_config.xml.tables[0].values = selected_df;
+
+    Ok(new_config)
+}
+
+fn _is_table_layout_approved(config: &MortTableConfig) -> bool {
     // Check table layout
-    let approved_table_layouts = vec!["Aggregate", "Ultimate"];
+    let approved_table_layouts = ["Select", "Select & Ultimate"];
     let key_words = config.xml.content_classification.key_words.clone();
 
     // Check if any keyword matches any approved table layout
-    let tbl_layout_result = key_words.iter().any(|keyword| {
+    key_words.iter().any(|keyword| {
         approved_table_layouts
             .iter()
             .any(|layout| keyword == layout)
-    });
-
-    // Content type check
-    let approved_content_types = vec![
-        "ADB, AD&D",
-        "Annuitant Mortality",
-        "Claim Cost (in Disability)",
-        "Claim Incidence",
-        "Claim Termination",
-        "CSO / CET",
-        "Disability Recovery",
-        "Disabled Lives Mortality",
-        "Disability Incidence",
-        "Group Life",
-        "Healthy Lives Mortality",
-        "Insured Lives Mortality",
-        "Insured Lives Mortality - Ultimate",
-        "Projection Scale",
-        "Termination Voluntary",
-    ];
-
-    let content_type = config.xml.content_classification.content_type.clone();
-
-    // Check if content type is in approved content types
-    let content_type_result = approved_content_types
-        .iter()
-        .any(|approved_type| content_type == *approved_type);
-
-    // Return result
-    tbl_layout_result && content_type_result
+    })
 }
 
-pub fn get_selected_mortality_table(
+fn _get_selected_mortality_table(
     config: &MortTableConfig,
     entry_age: i32,
 ) -> PolarsResult<DataFrame> {
@@ -56,7 +46,7 @@ pub fn get_selected_mortality_table(
     // Entry age cannot be smaller than smallest age in table
     if entry_age < min_age {
         return Err(PolarsError::ComputeError(
-            format!("Entry age {entry_age} cannot be less than minimum age {min_age}",).into(),
+            format!("Entry age {entry_age} cannot be less than minimum age {min_age}").into(),
         ));
     }
 

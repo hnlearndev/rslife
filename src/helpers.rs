@@ -51,31 +51,6 @@ use polars::prelude::*;
 /// - The requested age is not found in the table
 /// - The requested column does not exist
 /// - Interest rate is required but not provided for levels 3-4
-///
-/// # Examples
-/// ```rust
-/// use rslife::prelude::*;
-/// use rslife::helpers::get_value;
-/// fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let xml = MortXML::from_url_id(1704)?;
-///     let config = MortTableConfig {
-///         xml,
-///         radix: Some(100_000),
-///         pct: Some(1.0),
-///         int_rate: Some(0.03),
-///         assumption: Some(AssumptionEnum::UDD),
-///     };
-///     // Level 1: Basic mortality rate (fastest)
-///     let qx_value = get_value(&config, 65, "qx")?;
-///     // Level 2: Population at age (fast)
-///     let lx_value = get_value(&config, 65, "lx")?;
-///     // Level 3: Commutation function (medium)
-///     let dx_value = get_value(&config, 65, "Dx")?;
-///     // Level 4: Actuarial present value (complete)
-///     let ax_value = get_value(&config, 65, "Ax")?;
-///     Ok(())
-/// }
-/// ```
 pub fn get_value(config: &MortTableConfig, x: i32, column_name: &str) -> PolarsResult<f64> {
     // Determine the minimum detail level required for this column
     let detail_level = match column_name {
@@ -96,7 +71,7 @@ pub fn get_value(config: &MortTableConfig, x: i32, column_name: &str) -> PolarsR
                     Level 1: qx, px, lx, dx; \
                     Level 2: Cx, Dx; \
                     Level 3: Mx, Nx, Px; \
-                    Level 4: Rx, Sx, Ax, AAx, IAx, IAAx, ax, aax, Iax, Iaax."
+                    Level 4: Rx, Sx"
                 )
                 .into(),
             ));

@@ -54,35 +54,37 @@
 //! The library provides comprehensive actuarial functions including:
 //!
 //! ### Life Insurance Benefits
-//! - `Ax` - Whole life insurance
-//! - `Axn` - Term life insurance
-//! - `AExn` - Endowment insurance
-//! - `Exn` - Pure endowment
-//! - `IAx`, `IAxn` - Increasing benefit insurance
-//! - `gAx`, `gAxn` - Geometric increasing insurance
+//! - `Ax(config, x)` - Whole life insurance
+//! - `Axn(config, x, n)` - Term life insurance
+//! - `AExn(config, x, n)` - Endowment insurance
+//! - `Exn(config, x, n)` - Pure endowment
+//! - `IAx(config, x)`, `IAxn(config, x, n)` - Increasing benefit insurance
+//! - `gAx(config, x)`, `gAxn(config, x, n)` - Geometric increasing insurance
 //!
 //! ### Deferred Life Insurance
-//! - `tAx` - Deferred whole life insurance
-//! - `tAxn` - Deferred term life insurance
-//! - `tExn` - Deferred pure endowment
-//! - `tAExn` - Deferred endowment insurance
+//! - `tAx(config, x, t)` - Deferred whole life insurance
+//! - `tAxn(config, x, t, n)` - Deferred term life insurance
+//! - `tExn(config, x, t, n)` - Deferred pure endowment
+//! - `tAExn(config, x, t, n)` - Deferred endowment insurance
 //!
 //! ### Annuities
-//! - `aaxn` - Life annuity due
-//! - `taax`, `taaxn` - Deferred annuities
-//! - `Iaax`, `Iaaxn` - Increasing annuities
-//! - `tIaax`, `tIaaxn` - Deferred increasing annuities
-//! - `gIaax`, `gIaaxn` - Geometric increasing annuities
+//! - `aaxn(config, x, n)` - Life annuity due
+//! - `taax(config, x, t)`, `taaxn(config, x, t, n)` - Deferred annuities
+//! - `Iaax(config, x, n)`, `Iaaxn(config, x, n)` - Increasing annuities
+//! - `tIaax(config, x, t, n)`, `tIaaxn(config, x, t, n)` - Deferred increasing annuities
+//! - `gIaax(config, x, n)`, `gIaaxn(config, x, n)` - Geometric increasing annuities
+//!
+//! **Note:** All functions require explicit `config` and argument parameters, following the signature conventions: `function(config, ...)`.
 //!
 //! ### Fractional Age Functions
-//! - `tpx` - Survival probability for fractional time
-//! - `tqx` - Death probability for fractional time
+//! - `tpx(config, t, x)` - Survival probability for fractional time/age (uses UDD, CFM, or HPB)
+//! - `tqx(config, t, x)` - Death probability for fractional time/age
 //!
 //! ### Select and Ultimate Functions
-//! - `tpx_` - Survival probability with entry age selection
-//! - `tqx_` - Death probability with entry age selection
+//! - `tpx_(config, entry_age, t, x)` - Survival probability with entry age selection (select/ultimate)
+//! - `tqx_(config, entry_age, t, x)` - Death probability with entry age selection
 //!
-//! All functions follow standard actuarial notation and support the three mortality assumptions.
+//! All functions follow standard actuarial notation and support the three mortality assumptions. Fractional and select/ultimate functions require explicit arguments for config, time, age, and (for selection) entry age.
 
 pub mod fractional;
 pub mod helpers;

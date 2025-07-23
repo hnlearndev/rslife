@@ -14,14 +14,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✅ Successfully loaded mortality table!");
     println!("📊 Table: {}", xml.content_classification.table_name);
     println!("📏 Rows: {}", table.values.height());
-    println!(
-        "🏷️  Table ID: {}",
-        xml.content_classification.table_identity
-    );
+    println!("🏷️  Table ID: {}", xml.content_classification.table_identity);
 
     // Show table structure
     let columns = table.values.get_column_names();
-    println!("📋 Columns: {:?}", columns);
+    println!("📋 Columns: {columns:?}");
 
     // Display metadata
     println!("\n📝 Metadata:");
@@ -33,7 +30,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n📈 First 5 rows:");
     if table.values.height() > 0 {
         let sample = table.values.head(Some(5));
-        println!("{}", sample);
+        println!("{sample}");
     }
 
     println!("\n🎉 Documentation example completed successfully!");

@@ -15,8 +15,8 @@ fn test_prelude_imports_basic_types() {
     // (we won't instantiate it here since we'd need actual XML data)
     let _config_type_name = std::any::type_name::<MortTableConfig>();
 
-    println!("Successfully imported AssumptionEnum: {:?}", assumption);
-    println!("MortTableConfig type available: {}", _config_type_name);
+    println!("Successfully imported AssumptionEnum: {assumption:?}");
+    println!("MortTableConfig type available: {_config_type_name}");
 
     // Verify the enum has the expected variants
     assert!(matches!(assumption, AssumptionEnum::UDD));
@@ -33,9 +33,9 @@ fn test_prelude_imports_polars_types() {
     let _series_type_name = std::any::type_name::<Series>();
     let _result_type_name = std::any::type_name::<PolarsResult<f64>>();
 
-    println!("DataFrame type available: {}", _df_type_name);
-    println!("Series type available: {}", _series_type_name);
-    println!("PolarsResult type available: {}", _result_type_name);
+    println!("DataFrame type available: {_df_type_name}");
+    println!("Series type available: {_series_type_name}");
+    println!("PolarsResult type available: {_result_type_name}");
 
     // Verify type names contain expected content
     assert!(_df_type_name.contains("DataFrame"));
@@ -49,11 +49,8 @@ fn test_prelude_imports_xml_types() {
     let _xml_type_name = std::any::type_name::<MortXML>();
     let _content_class_type_name = std::any::type_name::<ContentClassification>();
 
-    println!("MortXML type available: {}", _xml_type_name);
-    println!(
-        "ContentClassification type available: {}",
-        _content_class_type_name
-    );
+    println!("MortXML type available: {_xml_type_name}");
+    println!("ContentClassification type available: {_content_class_type_name}");
 
     // Verify type names are correct
     assert!(_xml_type_name.contains("MortXML"));
@@ -159,7 +156,7 @@ fn test_prelude_comprehensive_functionality() {
     ];
 
     println!("✓ All function categories successfully imported");
-    println!("✓ AssumptionEnum working: {:?}", assumption);
+    println!("✓ AssumptionEnum working: {assumption:?}");
     println!("✓ Comprehensive prelude functionality verified");
 }
 
@@ -192,6 +189,6 @@ fn test_prelude_with_real_data() {
     println!("✓ XML loading works through prelude");
     println!("✓ Function exports are accessible");
     println!("✓ Function type signatures are correct");
-    println!("✓ All {} benefit functions imported", 60);
-    println!("✓ All {} annuity functions imported", 28);
+    println!("✓ All {0} benefit functions imported", 60);
+    println!("✓ All {0} annuity functions imported", 28);
 }

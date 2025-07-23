@@ -35,9 +35,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let endowment_20 = A_x_n(&config, 30, 20)?;
 
     println!("Life Insurance (age 30):");
-    println!("  Whole life (A_x): {:.6}", whole_life);
-    println!("  20-year term (A_x1_n): {:.6}", term_20);
-    println!("  20-year endowment (A_x_n): {:.6}", endowment_20);
+    println!("  Whole life (A_x): {whole_life:.6}");
+    println!("  20-year term (A_x1_n): {term_20:.6}");
+    println!("  20-year endowment (A_x_n): {endowment_20:.6}");
     println!();
 
     // Annuity calculations
@@ -46,12 +46,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let annuity_annual_immediate = a_x_n(&config, 65, 20, 1)?;
 
     println!("Annuities (age 65, 20 years):");
-    println!("  Annual due payments: {:.6}", annuity_annual_due);
-    println!("  Monthly due payments: {:.6}", annuity_monthly_due);
-    println!(
-        "  Annual immediate payments: {:.6}",
-        annuity_annual_immediate
-    );
+    println!("  Annual due payments: {annuity_annual_due:.6}");
+    println!("  Monthly due payments: {annuity_monthly_due:.6}");
+    println!("  Annual immediate payments: {annuity_annual_immediate:.6}");
     println!();
 
     // Fractional age calculations
@@ -59,12 +56,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mortality_half_year = tqx(&config, 0.5, 30.0)?;
 
     println!("Fractional age calculations (6 months, age 30):");
-    println!("  Survival probability (tpx): {:.6}", survival_half_year);
-    println!("  Mortality probability (tqx): {:.6}", mortality_half_year);
-    println!(
-        "  Sum (should be 1.0): {:.6}",
-        survival_half_year + mortality_half_year
-    );
+    println!("  Survival probability (tpx): {survival_half_year:.6}");
+    println!("  Mortality probability (tqx): {mortality_half_year:.6}");
+    println!("  Sum (should be 1.0): {:.6}", survival_half_year + mortality_half_year);
     println!();
 
     println!("✓ All calculations completed successfully!");

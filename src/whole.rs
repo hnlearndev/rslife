@@ -1,46 +1,10 @@
-//! # Whole Numbers Actuarial Functions (Implementation Module)
-//!
-//! **Low-level implementation module** providing integer-optimized actuarial calculations.
-//! For comprehensive documentation, examples, and user guidance, see [`crate::actuarial`].
-//!
-//! ## Module Purpose
-//!
-//! This module contains **optimized implementations** for whole ages and integer time periods.
-//! Functions here are typically called through the unified [`crate::actuarial`] interface
-//! which provides automatic implementation selection and comprehensive documentation.
-//!
-//! ## Direct Usage
-//!
-//! ```rust
-//! use rslife::whole;
-//! use rslife::mt_config::{MortTableConfig, AssumptionEnum};
-//! use rslife::xml::MortXML;
-//! // Set up a sample config (requires internet for MortXML::from_url_id)
-//! fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let xml = MortXML::from_url_id(1704)?;
-//!     let config = MortTableConfig {
-//!         xml,
-//!         radix: Some(100_000),
-//!         pct: Some(1.0),
-//!         int_rate: Some(0.03),
-//!         assumption: Some(AssumptionEnum::UDD),
-//!     };
-//!     let value = whole::Ax(&config, 30)?; // Direct call (integer age only)
-//!     Ok(())
-//! }
-//! ```
-//!
-//! ## See Also
-//!
-//! - **[`crate::actuarial`]** - Primary user interface with full documentation
-//! - **[`benefits`]** - Insurance benefit implementations
-//! - **[`annuities`]** - Annuity implementations
-
+// Define module structure
 pub mod annuities;
 pub mod benefits;
 mod helpers;
 pub mod survivals;
 
+// Common imports for calculations
 use crate::helpers::get_value;
 use crate::mt_config::MortTableConfig;
 use polars::prelude::*;

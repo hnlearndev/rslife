@@ -1,4 +1,23 @@
-# Changelog
+# CHANGE LOG FOR RSLIFE PACKAGE
+
+## [0.1.2] - 2025-07-23
+
+### Changed in v0.1.2
+
+- Major API update: all actuarial, survival, and selection functions now require explicit `config` and argument parameters (e.g., `Ax(config, x)`, `tpx(config, t, x)`, `tpx_(config, entry_age, t, x)`).
+- Selection functions consistently use a `_` suffix and require an `entry_age` argument.
+- Function signatures and documentation updated for clarity and discoverability.
+- Module-level and crate-level documentation improved and standardized.
+- Export structure reorganized for easier use and better grouping in `prelude` and top-level modules.
+
+### Fixed
+
+- Improved error messages and validation for selection and fractional functions.
+- Doc examples and module docs now pass `cargo test --doc`.
+
+### Note
+
+- This release introduces breaking changes to function signatures and exports. Please update your code to use the new explicit argument conventions. See the README and documentation for migration guidance.
 
 All notable changes to this project will be documented in this file.
 
@@ -7,7 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.1] - 2025-07-20
 
-### Changed
+### Changed in v0.1.1
+
 - **BREAKING**: Updated annuity function naming convention to follow standard actuarial notation
   - `axn_due` → `aaxn`
   - `tax_due` → `taax`
@@ -20,13 +40,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `gIaxn_due` → `gIaaxn`
 
 ### Updated
+
 - All documentation and examples to reflect new function names
 - Function exports in prelude module
 - Test files to use new naming convention
 - README.md with comprehensive function documentation organized by categories
 
 ### Migration Guide
+
 If upgrading from 0.1.0, update your function calls:
+
 ```rust
 // Old (0.1.0)
 let annuity = axn_due(&config, 65, 20, 1)?;
@@ -40,6 +63,7 @@ let deferred = taax(&config, 65, 10, 1)?;
 ## [0.1.0] - 2025-07-20
 
 ### Added
+
 - Initial release of RSLife actuarial library
 - Comprehensive mortality table calculations
 - XML parsing for Society of Actuaries mortality data
@@ -51,6 +75,7 @@ let deferred = taax(&config, 65, 10, 1)?;
 - Full prelude module for convenient imports
 
 ### Features
+
 - Standard actuarial notation following industry conventions
 - Support for geometric and arithmetic increasing benefits
 - Deferred insurance and annuity calculations

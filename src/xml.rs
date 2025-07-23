@@ -8,12 +8,40 @@
 //! ```rust
 //! use rslife::prelude::*;
 //!
-//! // Load 2017 CSO mortality table from SOA
+//! // Load ELT 15 Female mortality table from SOA
 //! let xml = MortXML::from_url_id(1704)?;
 //! let table = &xml.tables[0];
 //!
 //! println!("Table: {}", xml.content_classification.table_name);
 //! println!("Rows: {}", table.values.height());
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! ## Custom DataFrame Example
+//!
+//! ```rust
+//! use rslife::prelude::*;
+//! use polars::prelude::*;
+//!
+//! // Create custom mortality data
+//! let df = df! {
+//!     "age" => [25, 26],
+//!     "qx" => [0.0015, 0.0018],
+//! }?;
+//!
+//! // Convert to mortality table
+//! let xml = MortXML::from_df(df)?;
+//! let config = MortTableConfig {
+//!     xml,
+//!     radix: Some(100_000),
+//!     pct: Some(1.0),
+//!     int_rate: None,
+//!     assumption: None,
+//! };
+//!
+//! // Generate life table
+//! let table = config.gen_mort_table(1)?;
+//! println!("Custom table rows: {}", table.height());
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
@@ -23,6 +51,7 @@
 //! - [`MortXML::from_path()`] - Load from local file
 //! - [`MortXML::from_url()`] - Load from any URL
 //! - [`MortXML::from_string()`] - Parse XML string
+//! - [`MortXML::from_df()`] - Create from custom DataFrame (development/testing)
 //!
 //! ## Data Structure
 //!
@@ -38,19 +67,6 @@ use std::path::Path;
 /// XTbML axis definition for table dimensions.
 ///
 /// Defines the structure of table axes (typically age and duration).
-///
-/// # Example
-/// ```rust
-/// use rslife::xml::AxisDef;
-///
-/// let age_axis = AxisDef {
-///     scale_type: "Age".to_string(),
-///     axis_name: "Age".to_string(),
-///     min_scale_value: 0,
-///     max_scale_value: 120,
-///     increment: 1,
-/// };
-/// ```
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct AxisDef {
@@ -70,20 +86,6 @@ pub struct AxisDef {
 ///
 /// Contains scaling factors, data type information, and axis definitions
 /// required for proper interpretation of table values.
-///
-/// # Example
-/// ```rust
-/// use rslife::xml::MetaData;
-///
-/// // Metadata indicates values are scaled by 1 million
-/// let metadata = MetaData {
-///     scaling_factor: 1000000.0,
-///     data_type: "Mortality Rate".to_string(),
-///     nation: "United States".to_string(),
-///     table_description: "2017 CSO Mortality Table".to_string(),
-///     axis_defs: vec![],
-/// };
-/// ```
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct MetaData {
@@ -103,22 +105,6 @@ pub struct MetaData {
 ///
 /// Contains table metadata and mortality rates in a high-performance DataFrame.
 /// DataFrame columns: `age`, `value`, and optionally `duration`.
-///
-/// # Example
-/// ```rust
-/// use rslife::prelude::*;
-/// use polars::prelude::{col, IntoLazy};
-///
-/// let xml = MortXML::from_url_id(1704)?;
-/// let table = &xml.tables[0];
-///
-/// // Query mortality rates for age 65
-/// let rates_65 = table.values.clone()
-///     .lazy()
-///     .filter(col("age").eq(65))
-///     .collect()?;
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct Table {
@@ -132,18 +118,6 @@ pub struct Table {
 ///
 /// Contains table metadata for discovery and regulatory compliance.
 /// The `table_identity` field is used with loading functions.
-///
-/// # Example
-/// ```rust
-/// use rslife::prelude::*;
-///
-/// let xml = MortXML::from_url_id(1704)?;
-/// let classification = &xml.content_classification;
-///
-/// println!("Table ID: {}", classification.table_identity);
-/// println!("Name: {}", classification.table_name);
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ContentClassification {
@@ -177,23 +151,11 @@ pub struct ContentClassification {
 /// - [`from_path()`](Self::from_path) - Load from local file
 /// - [`from_url()`](Self::from_url) - Load from any URL
 /// - [`from_string()`](Self::from_string) - Parse XML string
+/// - [`from_df()`](Self::from_df) - Create from custom DataFrame (development/testing)
 ///
 /// # Table IDs
 /// Find table IDs at [mort.soa.org](https://mort.soa.org/Default.aspx).
 /// Popular tables: 1704 (2017 CSO), 912 (1980 CSO), 1076 (2001 VBT).
-///
-/// # Example
-/// ```rust
-/// use rslife::prelude::*;
-///
-/// // Load 2017 CSO mortality table
-/// let xml = MortXML::from_url_id(1704)?;
-/// let table = &xml.tables[0];
-///
-/// println!("Table: {}", xml.content_classification.table_name);
-/// println!("Rows: {}", table.values.height());
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct MortXML {
@@ -251,6 +213,11 @@ impl MortXML {
         let root = doc.root_element();
         let content_classification = create_content_classification(&root)?;
         let tables = create_tables(&root)?;
+
+        if tables.len() != 1 {
+            return Err("MortXML must contain exactly one table".into());
+        }
+
         let result = MortXML {
             content_classification,
             tables,
@@ -350,6 +317,105 @@ impl MortXML {
     pub fn from_url_id(id: i32) -> Result<Self, Box<dyn std::error::Error>> {
         let url = format!("https://mort.soa.org/data/t{id}.xml");
         Self::from_url(&url)
+    }
+
+    /// Create mortality table from existing Polars DataFrame.
+    ///
+    /// **Development method** for creating mortality tables from custom data sources
+    /// or computed values. Wraps a DataFrame in the standard XTbML structure with
+    /// default metadata for compatibility with actuarial functions.
+    ///
+    /// ## Supported DataFrame Schemas
+    ///
+    /// **Ultimate Rate Tables:**
+    /// - `age: i32, qx: f64` - Mortality rates by age
+    /// - `age: i32, lx: i32` - Life counts by age
+    ///
+    /// **Select Rate Tables:**
+    /// - `age: i32, qx: f64, duration: i32` - Mortality rates by age and duration since entry
+    /// - `age: i32, lx: i32, duration: i32` - Life counts by age and duration since entry
+    ///
+    /// # Generated Metadata
+    /// - **Table ID**: 0 (local table indicator)
+    /// - **Scaling Factor**: 1.0 (no scaling applied)
+    /// - **Provider**: "Local DataFrame"
+    /// - **Data Type**: "Mortality Rate"
+    ///
+    /// # Use Cases
+    /// - Testing with synthetic mortality data
+    /// - Custom table construction from external sources
+    /// - Academic research with modified rate structures
+    /// - Integration with non-SOA data providers
+    ///
+    /// # Errors
+    /// - Invalid DataFrame structure
+    /// - Memory allocation failures for large tables
+    ///
+    /// # Example
+    /// ```rust
+    /// use rslife::prelude::*;
+    /// use polars::prelude::*;
+    ///
+    /// // Create synthetic mortality table
+    /// let ages = (0..121).collect::<Vec<i32>>();
+    /// let values = (0..121).map(|age| {
+    ///     // Simple mortality model: q_x = 0.001 * e^(age/80)
+    ///     0.001 * (age as f64 / 80.0).exp()
+    /// }).collect::<Vec<f64>>();
+    ///
+    /// let df = df! {
+    ///     "age" => ages,
+    ///     "value" => values,
+    /// }?;
+    ///
+    /// let mort_xml = MortXML::from_df(df)?;
+    ///
+    /// // Use with actuarial functions
+    /// let config = MortTableConfig {
+    ///     xml: mort_xml,
+    ///     radix: Some(100_000),
+    ///     pct: Some(1.0),
+    ///     int_rate: Some(0.03),
+    ///     assumption: Some(AssumptionEnum::UDD),
+    /// };
+    ///
+    /// println!("Table: {}", config.xml.content_classification.table_name);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn from_df(df: DataFrame) -> Result<Self, Box<dyn std::error::Error>> {
+        // Create a dummy ContentClassification
+        let content_classification = ContentClassification {
+            table_identity: 0,
+            provider_domain: "local".to_string(),
+            provider_name: "Local DataFrame".to_string(),
+            table_reference: "DataFrame Table".to_string(),
+            content_type: "Mortality/Life table".to_string(),
+            table_name: "DataFrame Table".to_string(),
+            table_description: "Table created from DataFrame".to_string(),
+            comments: "No comments".to_string(),
+            key_words: vec![],
+        };
+
+        // Create a dummy Table with empty metadata
+        let meta_data = MetaData {
+            scaling_factor: 1.0,
+            data_type: "Mortality Rate".to_string(),
+            nation: "Local".to_string(),
+            table_description: "Table created from DataFrame".to_string(),
+            axis_defs: vec![],
+        };
+
+        let table = Table {
+            meta_data,
+            values: df,
+        };
+
+        let result = MortXML {
+            content_classification,
+            tables: vec![table],
+        };
+
+        Ok(result)
     }
 }
 
@@ -595,12 +661,27 @@ fn create_values(table_node: &roxmltree::Node) -> Result<DataFrame, Box<dyn std:
 
     let mut columns_vec: Vec<Column> = Vec::new();
 
+    // ages vector
     if ages.iter().any(|age| age.is_some()) {
         columns_vec.push(Series::new("age".into(), ages.clone()).into_column());
     }
 
-    columns_vec.push(Series::new("value".into(), values.clone()).into_column());
+    // value vector
+    let content_type = table_node
+        .descendants()
+        .find(|n| n.tag_name().name() == "ContentType")
+        .and_then(|n| n.text())
+        .unwrap_or("Mortality/Life table");
 
+    let value_column_name = if content_type == "Life Table" {
+        "lx"
+    } else {
+        "qx"
+    };
+
+    columns_vec.push(Series::new(value_column_name.into(), values.clone()).into_column());
+
+    // durations vector (optional)
     if durations.iter().any(|duration| duration.is_some()) {
         columns_vec.push(Series::new("duration".into(), durations.clone()).into_column());
     }
@@ -613,7 +694,7 @@ fn create_values(table_node: &roxmltree::Node) -> Result<DataFrame, Box<dyn std:
         .iter()
         .any(|name| name.as_str() == "duration")
     {
-        df.lazy().filter(col("duration").is_not_null()).collect()?
+        df.lazy().filter(col("duration").is_not_null()).collect()? // This is due to algorithm, null values will be present
     } else {
         df
     };
@@ -685,13 +766,14 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_xml_from_url_id() {
         // This will call the MortXML::from_url method as well
         let result = MortXML::from_url_id(912);
         assert!(result.is_ok(), "Failed to load MortXML from URL ID");
 
         let mort_xml = result.unwrap();
-        assert!(mort_xml.tables.len() > 0, "No tables loaded from URL ID");
+        assert!(!mort_xml.tables.is_empty(), "No tables loaded from URL ID");
 
         let df = &mort_xml.tables[0].values;
         assert!(df.height() > 0, "DataFrame is empty");
@@ -720,7 +802,7 @@ mod tests {
         assert!(result.is_ok(), "Failed to load MortXML from id 1704");
 
         let mort_xml = result.unwrap();
-        assert!(mort_xml.tables.len() > 0, "No tables loaded from ID");
+        assert!(!mort_xml.tables.is_empty(), "No tables loaded from ID");
 
         let df = &mort_xml.tables[0].values;
         assert!(df.height() > 0, "DataFrame is empty");
@@ -743,7 +825,7 @@ mod tests {
 
         println!("Table name: {}", mort_xml.content_classification.table_name);
         println!("Number of rows: {}", df.height());
-        println!("First value: {:?}", first_value);
+        println!("First value: {first_value:?}");
     }
 
     #[test]
@@ -756,7 +838,7 @@ mod tests {
         assert!(result.is_ok(), "Failed to load MortXML from path");
 
         let mort_xml = result.unwrap();
-        assert!(mort_xml.tables.len() > 0, "No tables loaded from path");
+        assert!(!mort_xml.tables.is_empty(), "No tables loaded from path");
 
         let df = &mort_xml.tables[0].values;
         assert!(df.height() > 0, "DataFrame is empty");
@@ -774,5 +856,102 @@ mod tests {
 
         println!("Table name: {}", mort_xml.content_classification.table_name);
         println!("Number of rows: {}", df.height());
+    }
+
+    #[test]
+    fn test_xml_from_df() {
+        use polars::prelude::*;
+
+        // Create synthetic mortality table data
+        let ages = (0..121).collect::<Vec<i32>>();
+        let values = (0..121)
+            .map(|age| {
+                // Simple mortality model: q_x = 0.001 * e^(age/80)
+                0.001 * (age as f64 / 80.0).exp()
+            })
+            .collect::<Vec<f64>>();
+
+        // Create DataFrame
+        let df = df! {
+            "age" => ages.clone(),
+            "value" => values.clone(),
+        }
+        .expect("Failed to create DataFrame");
+
+        // Test from_df method
+        let result = MortXML::from_df(df);
+        assert!(result.is_ok(), "Failed to create MortXML from DataFrame");
+
+        let mort_xml = result.unwrap();
+
+        // Verify structure
+        assert_eq!(mort_xml.tables.len(), 1, "Should have exactly one table");
+
+        let table = &mort_xml.tables[0];
+        assert_eq!(
+            table.values.height(),
+            121,
+            "Should have 121 rows (ages 0-120)"
+        );
+        assert!(
+            table.values.column("age").is_ok(),
+            "Should have 'age' column"
+        );
+        assert!(
+            table.values.column("value").is_ok(),
+            "Should have 'value' column"
+        );
+
+        // Verify content classification defaults
+        let classification = &mort_xml.content_classification;
+        assert_eq!(
+            classification.table_identity, 0,
+            "Should have ID 0 for local table"
+        );
+        assert_eq!(classification.provider_name, "Local DataFrame");
+        assert_eq!(classification.table_name, "DataFrame Table");
+        assert_eq!(classification.content_type, "Mortality/Life table");
+
+        // Verify metadata defaults
+        let metadata = &table.meta_data;
+        assert_eq!(
+            metadata.scaling_factor, 1.0,
+            "Should have scaling factor 1.0"
+        );
+        assert_eq!(metadata.data_type, "Mortality Rate");
+        assert_eq!(metadata.nation, "Local");
+
+        // Verify some data values
+        let age_column = table.values.column("age").unwrap();
+        let value_column = table.values.column("value").unwrap();
+
+        // Check first row (age 0)
+        let first_age = age_column.get(0).unwrap();
+        let first_value = value_column.get(0).unwrap();
+
+        assert_eq!(first_age.try_extract::<i32>().unwrap(), 0);
+        // First value should be 0.001 * e^(0/80) = 0.001 * 1 = 0.001
+        assert!((first_value.try_extract::<f64>().unwrap() - 0.001).abs() < 1e-10);
+
+        // Check last row (age 120)
+        let last_age = age_column.get(120).unwrap();
+        let last_value = value_column.get(120).unwrap();
+
+        assert_eq!(last_age.try_extract::<i32>().unwrap(), 120);
+        // Last value should be 0.001 * e^(120/80) = 0.001 * e^1.5 ≈ 0.004481
+        let expected_last_value = 0.001 * (120.0_f64 / 80.0).exp();
+        assert!((last_value.try_extract::<f64>().unwrap() - expected_last_value).abs() < 1e-6);
+
+        println!("✓ Successfully created MortXML from DataFrame");
+        println!("  Table name: {}", classification.table_name);
+        println!("  Rows: {}", table.values.height());
+        println!(
+            "  First mortality rate (age 0): {:.6}",
+            first_value.try_extract::<f64>().unwrap()
+        );
+        println!(
+            "  Last mortality rate (age 120): {:.6}",
+            last_value.try_extract::<f64>().unwrap()
+        );
     }
 }

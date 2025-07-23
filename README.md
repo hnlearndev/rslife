@@ -33,41 +33,66 @@ rslife = "0.1.1"
 use rslife::prelude::*;
 
 fn main() -> PolarsResult<()> {
-    // Load mortality data from SOA
+    // Load SOA mortality table
     let xml = MortXML::from_url_id(1704)?;
-
-    // Configure mortality table
     let config = MortTableConfig {
-        xml,
-        radix: Some(100_000),
-        pct: Some(1.0),
-        int_rate: Some(0.03),
-        assumption: Some(AssumptionEnum::UDD),
+        xml, radix: Some(100_000), int_rate: Some(0.03), ..Default::default()
     };
 
     // Calculate actuarial values
-    let whole_life_35 = Ax(&config, 35)?;
-    let life_annuity_35 = aaxn(&config, 35, 1)?;
+    let whole_life = Ax(&config, 35)?;
+    let annuity = aaxn(&config, 35, 1)?;
+    let survival = tpx(&config, 5.0, 30.0)?;
 
-    // Fractional age survival
-    let survival_5_years = tpx(&config, 5.0, 30.0)?;
+    println!("Whole life: {:.6}, Annuity: {:.6}, 5yr survival: {:.6}",
+             whole_life, annuity, survival);
+    Ok(())
+}
+```
 
-    println!("Whole life insurance (age 35): {:.6}", whole_life_35);
-    println!("Life annuity due (age 35): {:.6}", life_annuity_35);
-    println!("5-year survival from age 30: {:.6}", survival_5_years);
+### Custom Data Example
 
+```rust
+use polars::prelude::*;
+use rslife::prelude::*;
+
+fn main() -> PolarsResult<()> {
+    // Create custom mortality DataFrame
+    let df = df! {
+        "age" => [30, 31, 32, 33, 34],
+        "qx" => [0.001, 0.0012, 0.0015, 0.0018, 0.002],
+    }?;
+
+    // Load from DataFrame
+    let xml = MortXML::from_df(df, "Custom2025")?;
+    let config = MortTableConfig {
+        xml, radix: Some(10_000), int_rate: Some(0.05), ..Default::default()
+    };
+
+    let insurance_value = Ax(&config, 30)?;
+    println!("Custom table insurance value: {:.6}", insurance_value);
     Ok(())
 }
 ```
 
 ## Performance Optimization
 
-RSLife automatically optimizes performance with a 2-level detail system:
+### SOA Mortality Table Automatical Classification
 
-- **Level 1** (~2x faster): Basic demographic functions (`qx`, `px`, `lx`, `dx`) - for life table analysis
-- **Level 2** (complete): All commutation functions (`Dx`, `Nx`, `Cx`, `Mx`, etc.) - for actuarial calculations
+- Only XML files with exactly 1 table are supported.
+- The package automatically detects whether `qx` or `lx` is provided and generates a complete mortality table as needed.
+- Selection functions automatically detect whether the appropriate SOA mortality table is used for calculation.
 
-Functions automatically use the minimum required level for optimal performance.
+### Computation
+
+RSLife automatically optimizes performance with a 4-level detail system:
+
+- **Level 1** (~3x faster): Demographics only (`age`, `qx`, `px`, `lx`, `dx`) - for life table analysis
+- **Level 2** (standard): Level 1 + basic commutation (`Cx`, `Dx`) - for most actuarial calculations
+- **Level 3** (extended): Level 2 + additional commutation (`Mx`, `Nx`, `Px`) - for some calculations
+- **Level 4** (complete): Same as Level 3 + additional `Rx`, `Sx` - reserved for future specialized functions
+
+Functions automatically select the minimum required level for optimal performance.
 
 ## Mortality Assumptions
 
@@ -99,90 +124,62 @@ Hyperbolic interpolation:
 
 ## Actuarial Functions & Naming Convention
 
-The library provides comprehensive actuarial functions following a systematic naming convention, as illustrated below:
+The library provides 88+ actuarial functions following systematic naming patterns based on standard actuarial notation:
 
 ![Function Naming Convention](diagrams/function_convention-benefits.drawio.gif)
 
-![Function Naming Convention](diagrams/function_convention-annuities.drawio.gif)
+### Function Structure
 
-```mermaid
-graph TD
-    A["Base Functions<br/>(immediate)"] --> B["Due Payments<br/>(start of period)"]
-    A --> C["Increasing Benefits<br/>(arithmetic growth)"]
-    A --> D["Geometric Benefits<br/>(geometric growth)"]
-    A --> E["Deferred Benefits<br/>(delayed start)"]
+**Base Patterns**:
 
-    B --> F["Increasing Due<br/>(due + increasing)"]
-    B --> G["Geometric Due<br/>(due + geometric)"]
-    B --> H["Deferred Due<br/>(deferred + due)"]
-
-    C --> I["Increasing Deferred<br/>(deferred + increasing)"]
-    D --> J["Geometric Deferred<br/>(deferred + geometric)"]
-
-    F --> K["Complex Combinations<br/>(all modifiers)"]
-    G --> K
-
-    style A fill:#e1f5fe
-    style B fill:#f3e5f5
-    style C fill:#e8f5e8
-    style D fill:#fff3e0
-    style E fill:#fce4ec
-    style F fill:#f1f8e9
-    style G fill:#fef7e0
-    style H fill:#e8eaf6
-    style I fill:#e0f2f1
-    style J fill:#fff8e1
-    style K fill:#ffebee
-```
-
-### Insurance Benefits
-
-**Core Functions**: `A_x` (whole life), `A_x1_n` (term), `A_x_n1` (deferred), `A_x_n` (endowment)
+- `A_x` (insurance)
+- `aa_x_n` (annuities)
+- `tpx` (survival)
 
 **Systematic Modifiers**:
 
-- **Due**: `AA_x` (premiums at period start)
-- **Increasing**: `IA_x` (arithmetic benefit growth)
-- **Geometric**: `gA_x` (geometric benefit growth)
-- **Deferred**: `t_A_x` (delayed benefit start)
+- **Due**: Double letter → `AA_x`, `aa_x` (payments at start)
+- **Increasing**: `I` prefix → `IA_x`, `Iaa_x` (arithmetic growth)
+- **Decreasing**: `D` prefix → `DA_x`, `Daa_x` (arithmetic decrease)
+- **Geometric**: `g` prefix → `gA_x`, `gaa_x` (geometric growth)
+- **Deferred**: `t_` prefix → `t_A_x`, `t_aa_x` (delayed start)
+- **Selection**: `_` suffix → `A_x_`, `tpx_` (select mortality tables)
 
-### Annuities
+**Examples**:
 
-**Core Functions**: `aa_x_n` (life due), `a_x_n` (immediate), with systematic parallel naming
-
-**Examples**: `t_aa_x` (deferred), `Iaa_x` (increasing), `gIaa_x` (geometric increasing)
-
-### Survival Functions
-
-**Core Functions**: `tpx(config, t, x)`, `tqx(config, t, x)` - survival and death probability functions
-
-**Fractional Age Support**: All survival functions support fractional ages and time periods with three mortality assumptions:
-
-- **UDD (Uniform Distribution of Deaths)**: `tpx(&config, 2.5, 35.3)` - linear interpolation
-- **CFM (Constant Force of Mortality)**: Exponential survival model for fractional periods
-- **HPB (Hyperbolic/Balmer)**: Hyperbolic interpolation between integer ages
-
-**Key Features**:
-
-- Full fractional age calculations (e.g., age 35.3, time period 2.5 years)
-- Automatic assumption selection based on `MortTableConfig.assumption`
-- Consistent behavior across all mortality calculation functions
+- `IA_x` (increasing whole life)
+- `t_aa_x` (deferred annuity)
+- `gIaa_x_n` (geometric increasing term annuity)
+- `A_x_` (whole life with selection)
 
 ### Selection Functions
 
-**Selection Functions**: All actuarial functions (insurance, annuities, and survival) have corresponding selection variants with a `_` suffix:
+All actuarial functions (insurance, annuities, and survival) have corresponding selection variants with a `_` suffix:
 
-- **Insurance**: `A_x_(config, entry_age, x)`, `AA_x_(config, entry_age, x)`, `IA_x_(config, entry_age, x)`, etc.
-- **Annuities**: `aa_x_n_(config, entry_age, x, n)`, `Iaa_x_(config, entry_age, x)`, `gaa_x_n_(config, entry_age, x, n)`, etc.
-- **Survival**: `tpx_(config, entry_age, t, x)`, `tqx_(config, entry_age, t, x)`
+- **Insurance**:
+  - `A_x_(config, entry_age, x)`,
+  - `AA_x_(config, entry_age, x)`,
+  - `IA_x_(config, entry_age, x)`,
+  - etc.
+- **Annuities**:
+  - `aa_x_n_(config, entry_age, x, n)`,
+  - `Iaa_x_(config, entry_age, x)`,
+  - `gaa_x_n_(config, entry_age, x, n)`,
+  - etc.
+- **Survival**:
+  - `tpx_(config, entry_age, t, x)`,
+  - `tqx_(config, entry_age, t, x)`
+  - etc.
 
-**Key Differences**:
+#### Key Differences
 
 - **Additional Parameter**: Selection functions require an `entry_age` parameter in addition to the standard parameters
 - **Signature**: `function_(config, entry_age, ...other_params)` vs `function(config, ...params)`
 - **Purpose**: Handle select mortality tables where mortality rates depend on both current age and time since policy issue
 
-**Design Rationale**: Selection functions use a separate namespace (with `_` suffix) rather than being integrated into the main functions because:
+#### Design Rationale
+
+Selection functions use a separate namespace (with `_` suffix) rather than being integrated into the main functions because:
 
 1. **Rare Usage**: Select mortality tables are encountered infrequently in practice
 2. **Explicit Intent**: When selection effects are relevant, it's better to make this explicit through distinct function names
@@ -190,29 +187,6 @@ graph TD
 4. **API Simplicity**: Keeps the main function signatures clean for the common non-select case
 
 This design choice prioritizes clarity and intentionality over API unification, ensuring that when selection effects matter, developers are explicitly aware of using specialized functionality.
-
-This systematic approach provides 48+ actuarial functions with consistent naming across insurance, annuities, and survival calculations.
-
-## Data Sources
-
-Load mortality data from various sources:
-
-```rust
-// From SOA website (by table ID)
-let xml = MortXML::from_url_id(1704)?;****
-
-// From local file
-let xml = MortXML::from_path("mortality_table.xml")?;
-
-// From URL
-let xml = MortXML::from_url("https://mort.soa.org/data/t1704.xml")?;
-
-// From XML string
-let xml_string = r#"<MortalityTable>...</MortalityTable>"#;
-let xml = MortXML::from_string(xml_string)?;
-```
-
-**Table IDs**: You can find mortality table IDs at [mort.soa.org](https://mort.soa.org/Default.aspx) - the first column with title "#" contains the ID numbers.
 
 ## Examples
 
@@ -226,42 +200,7 @@ Check out the `examples/` directory for more comprehensive examples:
 
 All functions include comprehensive mathematical documentation with Unicode formulas. View the full documentation at [docs.rs/rslife](https://docs.rs/rslife).
 
-**Note**: Function names follow traditional actuarial notation (e.g., `Ax`, `Axn`) rather than Rust's snake_case convention to maintain consistency with mathematical literature and industry standards. The compiler warnings about snake_case naming can be safely ignored for this domain-specific library.
-
 **Math Rendering**: The notation in this README and documentation uses Unicode characters for optimal rendering on both GitHub and crates.io, ensuring mathematical formulas display correctly across all platforms without requiring LaTeX rendering support.
-
-## Roadmap
-
-### Version 0.2.0 (Q4 2025)
-
-- **Enhanced Fractional Age Support**: Migrate all calculations to `fractional.rs` module for full UDD/CFM/HPB assumption support
-- **Selection with Duration Tables**: Add support for selection with duration table XML parsing and calculations (qₓ₊ₜ notation)
-- **Additional Mortality Functions**: Add `lx`, `dx`, `qx` series functions for demographic analysis
-- **Performance Optimizations**: Implement caching for commutation function calculations
-- **Extended XML Support**: Add support for additional mortality table formats and international standards
-
-### Version 0.3.0 (Q1 2026)
-
-- **Multi-Life Functions**: Joint life, last survivor, and contingent insurance calculations
-- **Pension Mathematics**: Add pension actuarial functions and retirement calculations
-- **Stochastic Models**: Implement Lee-Carter and other stochastic mortality models
-- **Parallel Processing**: Add optional parallel computation for large-scale calculations
-
-### Version 1.0.0 (Q1 2026)
-
-- **API Stabilization**: Finalize public API with semantic versioning guarantees
-- **Advanced Features**: Health insurance, disability models, and multi-state transitions
-- **Integration Tools**: Export capabilities for Excel, R, and Python interoperability
-- **Regulatory Compliance**: Support for Solvency II, IFRS 17, and other regulatory frameworks
-
-### Long-term Vision
-
-- **Machine Learning Integration**: Mortality forecasting and risk modeling
-- **Real-time Data Sources**: Live mortality data feeds and automatic updates
-- **Web Assembly Support**: Browser-based actuarial calculations
-- **Educational Tools**: Interactive tutorials and learning modules
-
-Contributions and feedback on the roadmap are welcome! Please open an issue to discuss priority features or suggest new directions.
 
 ## Contributing
 
@@ -275,7 +214,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Trung-Hieu Nguyen** - [hieunt.hello@gmail.com](mailto:hieunt.hello@gmail.com)
 
-Project Link: [https://github.com/hnlearndev/Basic-Term-Model-Rust-lifelibBasicTermSM](https://github.com/hnlearndev//rslife)
+Project Link: [https://github.com/hnlearndev/rslife](https://github.com/hnlearndev//rslife)
 
 ## References
 
@@ -287,7 +226,7 @@ Project Link: [https://github.com/hnlearndev/Basic-Term-Model-Rust-lifelibBasicT
 
 **Python:**
 
-- [pylife](https://github.com/actuarialopensource/pylife) - Python library for actuarial calculations and life insurance mathematics
+- [pyliferisk](https://github.com/franciscogarate/pyliferisk) - Python library for actuarial calculations and life insurance mathematics
 - [pymort](https://github.com/actuarialopensource/pymort) - Python mortality table library with XML parsing capabilities
 
 **R:**
@@ -301,4 +240,6 @@ Project Link: [https://github.com/hnlearndev/Basic-Term-Model-Rust-lifelibBasicT
 - [MortalityTables.jl](https://github.com/JuliaActuary/MortalityTables.jl) - Julia package for mortality table calculations and life contingencies
 - [ActuaryUtilities.jl](https://github.com/JuliaActuary/ActuaryUtilities.jl) - Julia utilities for actuarial modeling and analysis
 
-**Note**: Mojo is a relatively new language and doesn't yet have established actuarial libraries, but its performance characteristics make it promising for computational actuarial work.
+**Note**:
+
+Mojo is a relatively new language and doesn't yet have established actuarial libraries, but its performance characteristics make it promising for computational actuarial work.

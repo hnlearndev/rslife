@@ -34,3 +34,11 @@ node_modules/
 
 # Personal reference files
 README_FORMULAS.md
+
+# Folder diagrams
+diagrams/*.drawio
+diagrams/*.svg
+diagrams/*.bkp
+
+# Folder examples
+examples/*.pdf

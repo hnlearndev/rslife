@@ -2,7 +2,7 @@ use super::*;
 
 pub fn is_table_layout_approved(config: &MortTableConfig) -> bool {
     // Check table layout
-    let approved_table_layouts = vec!["Aggregate", "Ultimate"];
+    let approved_table_layouts = ["Aggregate", "Ultimate"];
     let key_words = config.xml.content_classification.key_words.clone();
 
     // Check if any keyword matches any approved table layout

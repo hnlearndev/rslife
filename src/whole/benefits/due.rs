@@ -1,5 +1,5 @@
-use super::*;
 use self::immediate::*;
+use super::*;
 
 // Note:
 // Due benefits means paid at begining of year of death, not end.
@@ -176,4 +176,3 @@ pub fn gAA_x_n(config: &MortTableConfig, x: i32, n: i32, g: f64) -> PolarsResult
     let result = AA_x_n(&new_config, x, n)?;
     Ok(result)
 }
-
