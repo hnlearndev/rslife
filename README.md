@@ -64,7 +64,7 @@ fn main() -> PolarsResult<()> {
     }?;
 
     // Load from DataFrame
-    let xml = MortXML::from_df(df, "Custom2025")?;
+    let xml = MortXML::from_df(df)?;
     let config = MortTableConfig {
         xml, radix: Some(10_000), int_rate: Some(0.05), ..Default::default()
     };
