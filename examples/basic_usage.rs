@@ -12,12 +12,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Load mortality data
     println!("Loading mortality table...");
-    let xml = MortXML::from_url_id(912)?;
+    let xml = MortXML::from_url_id(1704)?;
 
     // Create mortality table configuration
     let config = MortTableConfig {
         xml,
-        radix: 100_000,
+        radix: Some(100_000),
         pct: Some(1.0),
         int_rate: Some(0.03),
         assumption: Some(AssumptionEnum::UDD),
@@ -30,23 +30,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Performing actuarial calculations...");
 
     // Life insurance calculations
-    let whole_life = Ax(&config, 30.0)?;
-    let term_20 = Axn(&config, 30.0, 20)?;
-    let endowment_20 = AExn(&config, 30.0, 20)?;
+    let whole_life = A_x(&config, 30)?;
+    let term_20 = A_x1_n(&config, 30, 20)?;
+    let endowment_20 = A_x_n(&config, 30, 20)?;
 
     println!("Life Insurance (age 30):");
-    println!("  Whole life (Ax): {:.6}", whole_life);
-    println!("  20-year term (Axn): {:.6}", term_20);
-    println!("  20-year endowment (AExn): {:.6}", endowment_20);
+    println!("  Whole life (A_x): {:.6}", whole_life);
+    println!("  20-year term (A_x1_n): {:.6}", term_20);
+    println!("  20-year endowment (A_x_n): {:.6}", endowment_20);
     println!();
 
     // Annuity calculations
-    let annuity_annual = aaxn(&config, 65.0, 20, 1)?;
-    let annuity_monthly = aaxn(&config, 65.0, 20, 12)?;
+    let annuity_annual_due = aa_x_n(&config, 65, 20, 1)?;
+    let annuity_monthly_due = aa_x_n(&config, 65, 20, 12)?;
+    let annuity_annual_immediate = a_x_n(&config, 65, 20, 1)?;
 
     println!("Annuities (age 65, 20 years):");
-    println!("  Annual payments: {:.6}", annuity_annual);
-    println!("  Monthly payments: {:.6}", annuity_monthly);
+    println!("  Annual due payments: {:.6}", annuity_annual_due);
+    println!("  Monthly due payments: {:.6}", annuity_monthly_due);
+    println!(
+        "  Annual immediate payments: {:.6}",
+        annuity_annual_immediate
+    );
     println!();
 
     // Fractional age calculations

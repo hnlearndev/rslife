@@ -25,6 +25,9 @@ pub use crate::whole::{
     // Immediate increasing insurance benefits
     IA_x, IA_x1_n, IA_x_n1, IA_x_n,
 
+    // Immediate decreasing insurance benefits
+    DA_x1_n, DA_x_n1, DA_x_n,
+
     // Immediate geometric insurance benefits
     gA_x, gA_x1_n, gA_x_n1, gA_x_n,
 
@@ -33,6 +36,9 @@ pub use crate::whole::{
 
     // Due increasing insurance benefits (IÄₓ notation)
     IAA_x, IAA_x1_n, IAA_x_n1, IAA_x_n,
+
+    // Due decreasing insurance benefits (DÄₓ notation)
+    DAA_x1_n, DAA_x_n1, DAA_x_n,
 
     // Due geometric insurance benefits (gÄₓ notation)
     gAA_x, gAA_x1_n, gAA_x_n1, gAA_x_n,
@@ -43,6 +49,9 @@ pub use crate::whole::{
     // Deferred immediate increasing insurance benefits
     t_IA_x, t_IA_x1_n, t_IA_x_n1, t_IA_x_n,
 
+    // Deferred immediate decreasing insurance benefits
+    t_DA_x1_n, t_DA_x_n1, t_DA_x_n,
+
     // Deferred immediate geometric insurance benefits
     t_gA_x, t_gA_x1_n, t_gA_x_n1, t_gA_x_n,
 
@@ -52,19 +61,23 @@ pub use crate::whole::{
     // Deferred due increasing insurance benefits
     t_IAA_x, t_IAA_x1_n, t_IAA_x_n1, t_IAA_x_n,
 
+    // Deferred due decreasing insurance benefits
+    t_DAA_x1_n, t_DAA_x_n1, t_DAA_x_n,
+
     // Deferred due geometric insurance benefits
     t_gAA_x, t_gAA_x1_n, t_gAA_x_n1, t_gAA_x_n,
 
-    // Basic annuities
-    aaxn,
-    // Deferred annuities
-    taax, taaxn,
-    // Increasing annuities
-    Iaax, Iaaxn,
-    // Deferred increasing annuities
-    tIaax, tIaaxn,
-    // Geometric increasing annuities
-    gIaax, gIaaxn,
+    // Due annuities
+    aa_x, aa_x_n, Iaa_x, Iaa_x_n, Daa_x_n, gaa_x, gaa_x_n,
+
+    // Immediate annuities
+    a_x, a_x_n, Ia_x, Ia_x_n, Da_x_n, ga_x, ga_x_n,
+
+    // Deferred due annuities
+    t_aa_x, t_aa_x_n, t_Iaa_x, t_Iaa_x_n, t_Daa_x_n, t_gaa_x, t_gaa_x_n,
+
+    // Deferred immediate annuities
+    t_a_x, t_a_x_n, t_Ia_x, t_Ia_x_n, t_Da_x_n, t_ga_x, t_ga_x_n,
 };
 
 // Fractional calculations (already available)

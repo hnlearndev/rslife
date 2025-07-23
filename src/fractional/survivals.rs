@@ -38,7 +38,7 @@
 //! let xml = MortXML::from_url_id(912)?;
 //! let config = MortTableConfig {
 //!     xml,
-//!     radix: 100_000,
+//!     radix: Some(100_000),
 //!     pct: Some(1.0),
 //!     int_rate: None,
 //!     assumption: Some(AssumptionEnum::UDD),
@@ -93,7 +93,7 @@ use super::*;
 /// let xml = MortXML::from_url_id(912)?;
 /// let config = MortTableConfig {
 ///     xml,
-///     radix: 100_000,
+///     radix: Some(100_000),
 ///     pct: Some(1.0),
 ///     int_rate: None,
 ///     assumption: Some(AssumptionEnum::UDD),
@@ -189,7 +189,7 @@ mod tests {
         let xml = MortXML::from_url_id(912).expect("Failed to load XML");
         let config = MortTableConfig {
             xml,
-            radix: 100_000,
+            radix: Some(100_000),
             pct: Some(1.0),
             int_rate: None,
             assumption: Some(AssumptionEnum::UDD),
@@ -206,7 +206,7 @@ mod tests {
         let xml = MortXML::from_url_id(912).expect("Failed to load XML");
         let config = MortTableConfig {
             xml,
-            radix: 100_000,
+            radix: Some(100_000),
             pct: Some(1.0),
             int_rate: None,
             assumption: Some(AssumptionEnum::UDD),
@@ -223,7 +223,7 @@ mod tests {
         let xml = MortXML::from_url_id(912).expect("Failed to load XML");
         let config = MortTableConfig {
             xml,
-            radix: 100_000,
+            radix: Some(100_000),
             pct: Some(1.0),
             int_rate: None,
             assumption: Some(AssumptionEnum::UDD),
@@ -240,7 +240,7 @@ mod tests {
         let xml = MortXML::from_url_id(912).expect("Failed to load XML");
         let config = MortTableConfig {
             xml,
-            radix: 100_000,
+            radix: Some(100_000),
             pct: Some(1.0),
             int_rate: None,
             assumption: Some(AssumptionEnum::UDD),
@@ -257,7 +257,7 @@ mod tests {
         let xml = MortXML::from_url_id(912).expect("Failed to load XML");
         let config = MortTableConfig {
             xml,
-            radix: 100_000,
+            radix: Some(100_000),
             pct: Some(1.0),
             int_rate: None,
             assumption: Some(AssumptionEnum::UDD),
@@ -281,7 +281,7 @@ mod tests {
         // Test with 50% of base rates
         let config_50 = MortTableConfig {
             xml: xml.clone(),
-            radix: 100_000,
+            radix: Some(100_000),
             pct: Some(0.5),
             int_rate: None,
             assumption: Some(AssumptionEnum::UDD),
@@ -290,7 +290,7 @@ mod tests {
         // Test with 100% of base rates
         let config_100 = MortTableConfig {
             xml,
-            radix: 100_000,
+            radix: Some(100_000),
             pct: Some(1.0),
             int_rate: None,
             assumption: Some(AssumptionEnum::UDD),
@@ -311,7 +311,7 @@ mod tests {
         let xml = MortXML::from_url_id(912).expect("Failed to load XML");
         let config = MortTableConfig {
             xml,
-            radix: 100_000,
+            radix: Some(100_000),
             pct: Some(1.0),
             int_rate: None,
             assumption: Some(AssumptionEnum::CFM),
@@ -333,7 +333,7 @@ mod tests {
         let xml = MortXML::from_url_id(912).expect("Failed to load XML");
         let config = MortTableConfig {
             xml,
-            radix: 100_000,
+            radix: Some(100_000),
             pct: Some(1.0),
             int_rate: None,
             assumption: Some(AssumptionEnum::HPB),
@@ -356,7 +356,7 @@ mod tests {
 
         let config_udd = MortTableConfig {
             xml: xml.clone(),
-            radix: 100_000,
+            radix: Some(100_000),
             pct: Some(1.0),
             int_rate: None,
             assumption: Some(AssumptionEnum::UDD),
@@ -364,7 +364,7 @@ mod tests {
 
         let config_cfm = MortTableConfig {
             xml: xml.clone(),
-            radix: 100_000,
+            radix: Some(100_000),
             pct: Some(1.0),
             int_rate: None,
             assumption: Some(AssumptionEnum::CFM),
@@ -372,7 +372,7 @@ mod tests {
 
         let config_hpb = MortTableConfig {
             xml,
-            radix: 100_000,
+            radix: Some(100_000),
             pct: Some(1.0),
             int_rate: None,
             assumption: Some(AssumptionEnum::HPB),
@@ -407,7 +407,7 @@ mod tests {
         let xml = MortXML::from_url_id(912).expect("Failed to load XML");
         let config = MortTableConfig {
             xml,
-            radix: 100_000,
+            radix: Some(100_000),
             pct: Some(1.0),
             int_rate: None,
             assumption: Some(AssumptionEnum::UDD),
@@ -416,7 +416,7 @@ mod tests {
         // Test unsupported assumption
         let config_invalid = MortTableConfig {
             xml: config.xml.clone(),
-            radix: 100_000,
+            radix: Some(100_000),
             pct: Some(1.0),
             int_rate: None,
             assumption: None, // No assumption specified

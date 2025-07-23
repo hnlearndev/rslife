@@ -60,7 +60,7 @@ use polars::prelude::*;
 ///     let xml = MortXML::from_url_id(1704)?;
 ///     let config = MortTableConfig {
 ///         xml,
-///         radix: 100_000,
+///         radix: Some(100_000),
 ///         pct: Some(1.0),
 ///         int_rate: Some(0.03),
 ///         assumption: Some(AssumptionEnum::UDD),

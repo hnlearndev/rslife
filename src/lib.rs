@@ -22,7 +22,7 @@
 //! // Configure mortality table with your XML data
 //! // let config = MortTableConfig {
 //! //     xml: mort_xml,
-//! //     radix: 100_000,
+//! //     radix: Some(100_000),
 //! //     pct: Some(1.0),
 //! //     int_rate: Some(0.03),
 //! //     assumption: Some(AssumptionEnum::UDD),
