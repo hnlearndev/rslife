@@ -127,25 +127,13 @@ impl MortTableConfig {
     ///
     /// # Detail Levels
     ///
-    /// - **Level 1**: Basic demographic functions (`age`, `qx`, `px`, `lx`, `dx`). Fastest, for life table and survival analysis.
-    /// - **Level 2**: Complete commutation functions (all level 1 plus `Cx`, `Dx`, `Mx`, `Nx`, `Px`, `Rx`, `Sx`). For comprehensive actuarial calculations (requires `int_rate`).
-    /// - **Level 3**: Extended commutation functions (all level 2 plus additional functions). For advanced actuarial analysis (requires `int_rate`).
-    /// - **Level 4**: Complete actuarial toolkit (all level 3 plus specialized functions). For comprehensive actuarial analysis (requires `int_rate`).
-    ///
-    /// # Output Guarantee
-    ///
-    /// Regardless of input format, always produces DataFrame with:
-    /// - **Level 1**: `age`, `qx`, `px`, `lx`, `dx`
-    /// - **Level 2**: All level 1 plus `Cx`, `Dx`, `Mx`, `Nx`, `Px`, `Rx`, `Sx`
-    /// - **Level 3**: All level 2 plus additional commutation functions
-    /// - **Level 4**: All level 3 plus specialized actuarial functions
+    /// - **Level 1**: Basic demographic functions (`age`, `qx`, `px`, `lx`, `dx`)
+    /// - **Level 2**: Level 1 plus `Cx`, `Dx`
+    /// - **Level 3**: Level 2 plus `Mx`, `Nx`, `Px`
+    /// - **Level 4**: Level 3 plus `Rx`, `Sx`
     ///
     /// # Parameters
     /// - `detail_level`: Requested level of calculation detail (1-4)
-    ///   - **Level 1**: Demographics only (`age`, `qx`, `px`, `lx`, `dx`)
-    ///   - **Level 2**: Complete commutation (`Cx`, `Dx`, `Mx`, `Nx`, `Px`, `Rx`, `Sx`)
-    ///   - **Level 3**: Extended commutation (all level 2 plus additional functions)
-    ///   - **Level 4**: Complete actuarial toolkit (all level 3 plus specialized functions)
     ///   - Configuration automatically detects data format from XML content classification
     ///   - Applies percentage adjustment uniformly across formats
     ///   - Uses radix for rate-based data, preserves counts for life table data
@@ -262,27 +250,24 @@ impl MortTableConfig {
 
         match detail_level {
             // Level 1: Include age, qx, px, lx, dx
-            1 => gen_demographic_movement(self.clone()),
+            1 => gen_demographic_movement_level_1(self.clone()),
             // Level 2: Include level 1 plus Cx, Dx, Mx, Nx, Px, Rx, Sx
             2 => {
-                let df = gen_demographic_movement(self.clone())?;
-                let df = gen_commutation_level_1(df, self.int_rate.unwrap())?;
-                gen_commutation_level_2(df)
+                let df = gen_demographic_movement_level_1(self.clone())?;
+                gen_commutation_level_2(df, self.int_rate.unwrap())
             }
             // Level 3: Include level 2 plus additional commutation functions (same as level 2 for now)
             3 => {
-                let df = gen_demographic_movement(self.clone())?;
-                let df = gen_commutation_level_1(df, self.int_rate.unwrap())?;
-                let df = gen_commutation_level_2(df)?;
+                let df = gen_demographic_movement_level_1(self.clone())?;
+                let df = gen_commutation_level_2(df, self.int_rate.unwrap())?;
                 gen_commutation_level_3(df)
             }
             // Level 4: Complete actuarial toolkit (same as level 3 for now - placeholder for future expansion)
             4 => {
-                let df = gen_demographic_movement(self.clone())?;
-                let df = gen_commutation_level_1(df, self.int_rate.unwrap())?;
-                let df = gen_commutation_level_2(df)?;
+                let df = gen_demographic_movement_level_1(self.clone())?;
+                let df = gen_commutation_level_2(df, self.int_rate.unwrap())?;
                 let df = gen_commutation_level_3(df)?;
-                Ok(df)
+                gen_commutation_level_4(df)
             }
             // Invalid detail level
             _ => Err(PolarsError::ComputeError(
@@ -294,7 +279,7 @@ impl MortTableConfig {
 
 //--------- HELPER FUNCTIONS FOR MORTALITY TABLE GENERATION ---------//
 
-fn gen_demographic_movement(config: MortTableConfig) -> PolarsResult<DataFrame> {
+fn gen_demographic_movement_level_1(config: MortTableConfig) -> PolarsResult<DataFrame> {
     let df = &config.xml.tables[0].values;
     if df.get_column_names().contains(&&"lx".into()) {
         _gen_demographic_movement_life_table_content(config)
@@ -393,7 +378,7 @@ fn _gen_demographic_movement_other_content(config: MortTableConfig) -> PolarsRes
     Ok(result)
 }
 
-fn gen_commutation_level_1(
+fn gen_commutation_level_2(
     df: DataFrame,
     int_rate: f64, // Interest rate
 ) -> PolarsResult<DataFrame> {
@@ -430,7 +415,7 @@ fn gen_commutation_level_1(
     Ok(result)
 }
 
-fn gen_commutation_level_2(df: DataFrame) -> PolarsResult<DataFrame> {
+fn gen_commutation_level_3(df: DataFrame) -> PolarsResult<DataFrame> {
     let cx = df.column("Cx")?.f64()?.to_vec();
     let dx = df.column("Dx")?.f64()?.to_vec();
 
@@ -465,7 +450,7 @@ fn gen_commutation_level_2(df: DataFrame) -> PolarsResult<DataFrame> {
     Ok(result)
 }
 
-fn gen_commutation_level_3(df: DataFrame) -> PolarsResult<DataFrame> {
+fn gen_commutation_level_4(df: DataFrame) -> PolarsResult<DataFrame> {
     // Extract required columns
     let mx = df.column("Mx")?.f64()?.to_vec();
     let nx = df.column("Nx")?.f64()?.to_vec();
