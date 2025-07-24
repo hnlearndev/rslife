@@ -42,13 +42,14 @@ fn main() -> PolarsResult<()> {
     };
 
     // Calculate actuarial values
-    let whole_life = Ax(&config, 35)?;
-    let annuity = aaxn(&config, 35, 1)?;
-    let survival = tpx(&config, 5.0, 30.0)?;
+    let whole_life = A_x(&config, 35)?;
+    let annuity = aa_x_n(&config, 35, 1)?;
+    let survival = t_p_x(&config, 5.0, 30.0)?;
 
     println!("Whole life: {:.6}", whole_life);
     println!("Annuity: {:.6}", annuity);
     println!("5yr survival: {:.6}", survival);
+
     Ok(())
 }
 ```
@@ -69,11 +70,16 @@ fn main() -> PolarsResult<()> {
     // Load from DataFrame
     let xml = MortXML::from_df(df)?;
     let config = MortTableConfig {
-        xml, radix: Some(10_000), int_rate: Some(0.05), ..Default::default()
+        xml, radix: Some(10_000),
+        int_rate: Some(0.05),
+        pct: Some(0.01),
+        assumption: AssumptionEnum::UDD
     };
 
-    let insurance_value = Ax(&config, 30)?;
+    let insurance_value = A_x(&config, 30)?;
+
     println!("Custom table insurance value: {:.6}", insurance_value);
+
     Ok(())
 }
 ```
