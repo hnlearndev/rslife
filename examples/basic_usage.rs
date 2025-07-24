@@ -58,7 +58,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Fractional age calculations (6 months, age 30):");
     println!("  Survival probability (tpx): {survival_half_year:.6}");
     println!("  Mortality probability (tqx): {mortality_half_year:.6}");
-    println!("  Sum (should be 1.0): {:.6}", survival_half_year + mortality_half_year);
+    println!(
+        "  Sum (should be 1.0): {:.6}",
+        survival_half_year + mortality_half_year
+    );
     println!();
 
     println!("✓ All calculations completed successfully!");

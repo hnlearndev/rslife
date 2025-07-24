@@ -294,21 +294,32 @@ fn _gen_demographic_movement_life_table_content(
     let df = config.xml.tables[0].values.clone();
     let pct = config.pct.unwrap_or(1.0);
 
-    // Calculate lx values from the mortality table
-    let age = df.column("age")?.i32()?.to_vec();
-    let lx = df.column("lx")?.f64()?.to_vec();
+    // Obtain age and lx columns
+    let age: Vec<i32> = df
+        .column("age")?
+        .i32()?
+        .into_iter()
+        .map(|v| v.unwrap())
+        .collect();
+
+    let lx: Vec<f64> = df
+        .column("lx")?
+        .f64()?
+        .into_iter()
+        .map(|v| v.unwrap())
+        .collect();
 
     // Initialize vectors for new columns
     let mut qx: Vec<f64> = Vec::with_capacity(age.len());
     let mut px: Vec<f64> = Vec::with_capacity(age.len());
-    let mut dx: Vec<i32> = Vec::with_capacity(age.len());
+    let mut dx: Vec<f64> = Vec::with_capacity(age.len());
 
     for i in 0..age.len() - 1 {
         // dx
-        let dx_value = (lx[i].unwrap() - lx[i + 1].unwrap()).round() as i32;
+        let dx_value = (lx[i] - lx[i + 1]).round();
         dx.push(dx_value);
         // qx applied pct
-        let qx_value = (dx_value as f64) / lx[i].unwrap() * pct;
+        let qx_value = dx_value / lx[i] * pct;
         qx.push(qx_value);
         // px
         px.push(1.0 - qx_value);
@@ -334,26 +345,37 @@ fn _gen_demographic_movement_other_content(config: MortTableConfig) -> PolarsRes
     let pct = config.pct.unwrap_or(1.0);
     let radix = config.radix;
 
-    // Calculate lx values from the mortality table
-    let age = df.column("age")?.i32()?.to_vec();
-    let qx = df.column("qx")?.f64()?.to_vec();
+    // Obtain age and qx columns
+    let age: Vec<i32> = df
+        .column("age")?
+        .i32()?
+        .into_iter()
+        .map(|v| v.unwrap())
+        .collect();
+
+    let qx: Vec<f64> = df
+        .column("qx")?
+        .f64()?
+        .into_iter()
+        .map(|v| v.unwrap())
+        .collect();
 
     // Initialize vectors for new columns
     let mut qx_new: Vec<f64> = Vec::with_capacity(age.len());
     let mut px: Vec<f64> = Vec::with_capacity(age.len());
-    let mut lx: Vec<i32> = Vec::with_capacity(age.len());
-    let mut dx: Vec<i32> = Vec::with_capacity(age.len());
+    let mut lx: Vec<f64> = Vec::with_capacity(age.len());
+    let mut dx: Vec<f64> = Vec::with_capacity(age.len());
 
     // Default initial lx value
     if let Some(radix_val) = radix {
-        lx.push(radix_val);
+        lx.push(radix_val as f64);
     } else {
-        lx.push(100_000);
+        lx.push(100_000.0);
     }
 
     for i in 0..age.len() {
         // qx applied pct
-        let qx_val = qx[i].unwrap() * pct; // Known that the value is always present
+        let qx_val = qx[i] * pct; // Known that the value is always present
         qx_new.push(qx_val);
         // px
         px.push(1.0 - qx_val);
@@ -363,7 +385,7 @@ fn _gen_demographic_movement_other_content(config: MortTableConfig) -> PolarsRes
             lx.push(lx_value);
         }
         // dx
-        let dx_value = (lx[i] as f64 * qx_val).round() as i32;
+        let dx_value = lx[i] * qx_val;
         dx.push(dx_value);
     }
 
@@ -382,25 +404,42 @@ fn gen_commutation_level_2(
     df: DataFrame,
     int_rate: f64, // Interest rate
 ) -> PolarsResult<DataFrame> {
-    let age = df.column("age")?.i32()?.to_vec();
-    let lx = df.column("lx")?.i32()?.to_vec();
-    let dx = df.column("dx")?.i32()?.to_vec();
+    // Obtain age, lx, and dx columns
+    let age = df
+        .column("age")?
+        .i32()?
+        .into_iter()
+        .map(|v| v.unwrap())
+        .collect::<Vec<i32>>();
 
+    let lx = df
+        .column("lx")?
+        .f64()?
+        .into_iter()
+        .map(|v| v.unwrap())
+        .collect::<Vec<f64>>();
+
+    let dx = df
+        .column("dx")?
+        .f64()?
+        .into_iter()
+        .map(|v| v.unwrap())
+        .collect::<Vec<f64>>();
+
+    // Initialize vectors for new columns
     let mut Dx: Vec<f64> = Vec::with_capacity(age.len());
     let mut Cx: Vec<f64> = Vec::with_capacity(age.len());
 
     // Cx and Dx
     for i in 0..age.len() {
-        let age_f64 = age[i].unwrap() as f64;
-        let lx_f64 = lx[i].unwrap() as f64;
-        let dx_f64 = dx[i].unwrap() as f64;
+        let age_f64 = age[i] as f64;
 
         // Cx = vˣ⁺¹ * dx = dx / (1+i)ˣ⁺¹
-        let cx_value = dx_f64 / (1.0 + int_rate).powf(age_f64 + 1.0);
+        let cx_value = dx[i] / (1.0 + int_rate).powf(age_f64 + 1.0);
         Cx.push(cx_value);
 
         // Dx = vˣ * lx = lx / (1+i)ˣ
-        let dx_value = lx_f64 / (1.0 + int_rate).powf(age_f64);
+        let dx_value = lx[i] / (1.0 + int_rate).powf(age_f64);
         Dx.push(dx_value);
     }
 
@@ -416,13 +455,15 @@ fn gen_commutation_level_2(
 }
 
 fn gen_commutation_level_3(df: DataFrame) -> PolarsResult<DataFrame> {
+    // Obtain Cx and Dx columns
     let cx = df.column("Cx")?.f64()?.to_vec();
     let dx = df.column("Dx")?.f64()?.to_vec();
 
-    // Nx ,Mx and Px
+    // Inntialize vectors for new columns
     let mut Nx: Vec<f64> = Vec::with_capacity(cx.len());
     let mut Mx: Vec<f64> = Vec::with_capacity(cx.len());
     let mut Px: Vec<f64> = Vec::with_capacity(cx.len());
+
     for i in 0..cx.len() {
         let nx_value: f64 = dx[i..].iter().filter_map(|&v| v).sum();
         Nx.push(nx_value);
@@ -451,17 +492,15 @@ fn gen_commutation_level_3(df: DataFrame) -> PolarsResult<DataFrame> {
 }
 
 fn gen_commutation_level_4(df: DataFrame) -> PolarsResult<DataFrame> {
-    // Extract required columns
+    // Obtain Mx and Nx columns
     let mx = df.column("Mx")?.f64()?.to_vec();
     let nx = df.column("Nx")?.f64()?.to_vec();
 
-    let len = mx.len();
+    // Intialize vectors for new columns
+    let mut Rx: Vec<f64> = Vec::with_capacity(mx.len());
+    let mut Sx: Vec<f64> = Vec::with_capacity(mx.len());
 
-    // Rx and Sx
-    let mut Rx: Vec<f64> = Vec::with_capacity(len);
-    let mut Sx: Vec<f64> = Vec::with_capacity(len);
-
-    for i in 0..len {
+    for i in 0..mx.len() {
         let rx_value: f64 = mx[i..].iter().filter_map(|&v| v).sum();
         Rx.push(rx_value);
 
@@ -526,12 +565,12 @@ mod tests {
             "qx should be float"
         );
         assert!(
-            result.column("lx").unwrap().dtype().is_integer(),
-            "lx should be integer"
+            result.column("lx").unwrap().dtype().is_float(),
+            "lx should be float"
         );
         assert!(
-            result.column("dx").unwrap().dtype().is_integer(),
-            "dx should be integer"
+            result.column("dx").unwrap().dtype().is_float(),
+            "dx should be float"
         );
 
         println!("✓ Basic mortality table generated successfully");
@@ -692,24 +731,24 @@ mod tests {
         let lx_30_50 = table_50
             .column("lx")
             .unwrap()
-            .i32()
+            .f64()
             .unwrap()
             .get(30)
-            .unwrap_or(0);
+            .unwrap_or(0.0);
         let lx_30_100 = table_100
             .column("lx")
             .unwrap()
-            .i32()
+            .f64()
             .unwrap()
             .get(30)
-            .unwrap_or(0);
+            .unwrap_or(0.0);
         let lx_30_150 = table_150
             .column("lx")
             .unwrap()
-            .i32()
+            .f64()
             .unwrap()
             .get(30)
-            .unwrap_or(0);
+            .unwrap_or(0.0);
 
         assert!(
             lx_30_50 > lx_30_100,
@@ -736,10 +775,10 @@ mod tests {
             assumption: Some(AssumptionEnum::CFM),
         };
 
-        let result = config.gen_mort_table(2).expect("Failed to generate table");
+        let result = config.gen_mort_table(3).expect("Failed to generate table");
 
-        let lx = result.column("lx").unwrap().i32().unwrap();
-        let dx = result.column("dx").unwrap().i32().unwrap();
+        let lx = result.column("lx").unwrap().f64().unwrap();
+        let dx = result.column("dx").unwrap().f64().unwrap();
         let qx = result.column("qx").unwrap().f64().unwrap();
 
         // Test actuarial relationships for first few rows
@@ -749,8 +788,11 @@ mod tests {
             let qx_val = qx.get(i).unwrap();
 
             // Test: dx = lx * qx (approximately, due to rounding)
-            let expected_dx = (lx_val as f64 * qx_val).round() as i32;
-            assert_eq!(dx_val, expected_dx, "dx calculation incorrect at index {i}");
+            let expected_dx = lx_val * qx_val;
+            assert!(
+                (dx_val - expected_dx).abs() < 1.0,
+                "dx calculation incorrect at index {i}: expected {expected_dx}, got {dx_val}"
+            );
 
             // Test: qx should be between 0 and 1
             assert!(
@@ -804,8 +846,11 @@ mod tests {
                 .unwrap_or_else(|_| panic!("Failed with radix {radix}"));
 
             // Test that first lx value equals the radix
-            let first_lx = result.column("lx").unwrap().i32().unwrap().get(0).unwrap();
-            assert_eq!(first_lx, radix, "First lx should equal radix for {radix}");
+            let first_lx = result.column("lx").unwrap().f64().unwrap().get(0).unwrap();
+            assert_eq!(
+                first_lx, radix as f64,
+                "First lx should equal radix for {radix}"
+            );
 
             println!("✓ Radix {radix} working correctly");
         }
@@ -870,14 +915,14 @@ mod tests {
         }
 
         // Validate data integrity
-        let lx_col = result.column("lx").unwrap().i32().unwrap();
-        let dx_col = result.column("dx").unwrap().i32().unwrap();
+        let lx_col = result.column("lx").unwrap().f64().unwrap();
+        let dx_col = result.column("dx").unwrap().f64().unwrap();
         let qx_col = result.column("qx").unwrap().f64().unwrap();
 
         // Check that we start with the correct radix
         assert_eq!(
             lx_col.get(0).unwrap(),
-            100_000,
+            100_000.0,
             "Should start with 100,000 lives"
         );
 
@@ -967,8 +1012,8 @@ mod tests {
             .expect("Failed to generate high precision table");
 
         // Test precision of calculations
-        let lx = result.column("lx").unwrap().i32().unwrap();
-        let dx = result.column("dx").unwrap().i32().unwrap();
+        let lx = result.column("lx").unwrap().f64().unwrap();
+        let dx = result.column("dx").unwrap().f64().unwrap();
         let _qx = result.column("qx").unwrap().f64().unwrap();
 
         // Verify l(x+1) = lx - dx relationship
@@ -977,13 +1022,13 @@ mod tests {
             let dx_curr = dx.get(i).unwrap();
             let lx_next = lx.get(i + 1).unwrap();
 
-            assert_eq!(
-                lx_next,
-                lx_curr - dx_curr,
+            let expected_lx_next = lx_curr - dx_curr;
+            assert!(
+                (lx_next - expected_lx_next).abs() < 1e-6,
                 "Life table relationship violated at age {}: l(x+1)={}, lx-dx={}",
                 i,
                 lx_next,
-                lx_curr - dx_curr
+                expected_lx_next
             );
         }
 

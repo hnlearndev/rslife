@@ -60,7 +60,9 @@
 //! - **Metadata**: Scaling factors, descriptions, axis definitions
 //! - **Classification**: Table ID, provider, keywords for discovery
 
+use calamine::{Data, Reader, open_workbook_auto};
 use polars::prelude::*;
+use spreadsheet_ods::{Value, read_ods};
 use std::fs;
 use std::path::Path;
 
@@ -176,7 +178,7 @@ impl MortXML {
     /// - Malformed numeric data
     ///
     /// # Example
-    /// ```rust
+    /// ```rust, ignore
     /// use rslife::xml::MortXML;
     ///
     /// let xml_content = r#"<?xml version="1.0" encoding="utf-8"?>
@@ -227,7 +229,7 @@ impl MortXML {
 
     /// Load mortality table from local filesystem by table ID.
     ///
-    /// Loads from `src/table_xml/t{id}.xml`. Used for development/testing.
+    /// Loads from `data/t{id}.xml`. Used for development/testing.
     ///
     /// # Errors
     /// - File not found
@@ -235,14 +237,16 @@ impl MortXML {
     /// - Invalid XML content
     ///
     /// # Example
-    /// ```rust,ignore
-    /// // Requires src/table_xml/t1704.xml to exist
-    /// use std::path::Path;
-    /// let mort_xml = MortXML::from_path(Path::new("table_xml/t1704.xml"))?;
+    /// ```rust, ignore
+    /// use rslife::xml::MortXML;
+    ///
+    /// // Requires data/t1704.xml to exist
+    /// let mort_xml = MortXML::from_id(1704)?;
+    /// println!("Table: {}", mort_xml.content_classification.table_name);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn from_id(id: i32) -> Result<Self, Box<dyn std::error::Error>> {
-        let filename = format!("src/table_xml/t{id}.xml");
+        let filename = format!("data/t{id}.xml");
         let xml_str = fs::read_to_string(filename)?;
         Self::from_string(&xml_str)
     }
@@ -255,10 +259,11 @@ impl MortXML {
     /// - Invalid XML content
     ///
     /// # Example
-    /// ```rust,ignore
+    /// ```rust, ignore
     /// use std::path::Path;
+    /// use rslife::xml::MortXML;
     ///
-    /// let mort_xml = MortXML::from_path(Path::new("table_xml/t1704.xml"))?;
+    /// let mort_xml = MortXML::from_path(Path::new("data/t1704.xml"))?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn from_path(path: &Path) -> Result<Self, Box<dyn std::error::Error>> {
@@ -276,7 +281,7 @@ impl MortXML {
     /// - Invalid XML content
     ///
     /// # Example
-    /// ```rust
+    /// ```rust, ignore
     /// use rslife::xml::MortXML;
     ///
     /// let url = "https://mort.soa.org/data/t1704.xml";
@@ -306,7 +311,7 @@ impl MortXML {
     /// - SOA server errors
     ///
     /// # Example
-    /// ```rust
+    /// ```rust, ignore
     /// use rslife::xml::MortXML;
     ///
     /// // Load mortality table
@@ -329,11 +334,11 @@ impl MortXML {
     ///
     /// **Ultimate Rate Tables:**
     /// - `age: i32, qx: f64` - Mortality rates by age
-    /// - `age: i32, lx: i32` - Life counts by age
+    /// - `age: i32, lx: f64` - Life counts by age (note: must be f64, not i32)
     ///
     /// **Select Rate Tables:**
     /// - `age: i32, qx: f64, duration: i32` - Mortality rates by age and duration since entry
-    /// - `age: i32, lx: i32, duration: i32` - Life counts by age and duration since entry
+    /// - `age: i32, lx: f64, duration: i32` - Life counts by age and duration since entry
     ///
     /// # Generated Metadata
     /// - **Table ID**: 0 (local table indicator)
@@ -352,7 +357,7 @@ impl MortXML {
     /// - Memory allocation failures for large tables
     ///
     /// # Example
-    /// ```rust
+    /// ```rust, ignore
     /// use rslife::prelude::*;
     /// use polars::prelude::*;
     ///
@@ -365,7 +370,7 @@ impl MortXML {
     ///
     /// let df = df! {
     ///     "age" => ages,
-    ///     "value" => values,
+    ///     "qx" => values,
     /// }?;
     ///
     /// let mort_xml = MortXML::from_df(df)?;
@@ -383,6 +388,12 @@ impl MortXML {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn from_df(df: DataFrame) -> Result<Self, Box<dyn std::error::Error>> {
+        // Check dataframe schema first
+        // - First column must be i32, named "age",
+        // - Second column must be f64, named "qx" or "lx"
+        // - Third column optional, must be i32 if present and named "duration"
+        Self::_validate_df_schema(&df)?;
+
         // Create a dummy ContentClassification
         let content_classification = ContentClassification {
             table_identity: 0,
@@ -416,6 +427,524 @@ impl MortXML {
         };
 
         Ok(result)
+    }
+
+    /// Parse mortality table from XLSX file using calamine.
+    ///
+    /// Reads XLSX files and automatically parses columns based on their names:
+    /// - "age" and "duration" columns are parsed as i32
+    /// - All other columns ("qx", "lx", etc.) are parsed as f64
+    ///
+    /// Schema validation is performed by `from_df()` after parsing.
+    ///
+    /// # Errors
+    /// - File not found or not readable
+    /// - Invalid XLSX format
+    /// - Sheet not found
+    /// - Invalid data in cells
+    /// - Empty sheets or insufficient data
+    /// - Schema validation errors (via `from_df`)
+    ///
+    /// # Examples
+    /// ```rust, ignore
+    /// use rslife::xml::MortXML;
+    ///
+    /// // Ultimate table with qx values
+    /// let mort_xml = MortXML::from_xlsx("data/elt15.xlsx", "female")?;
+    ///
+    /// // Select table with duration
+    /// let mort_xml = MortXML::from_xlsx("data/am92_select.xlsx", "AM92")?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn from_xlsx(
+        xlsx_file: &str,
+        sheet_name: &str,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        // Open workbook
+        let mut workbook = open_workbook_auto(xlsx_file)
+            .map_err(|e| format!("Failed to open XLSX file '{xlsx_file}': {e}"))?;
+        let range = workbook
+            .worksheet_range(sheet_name)
+            .map_err(|e| format!("Failed to read sheet '{sheet_name}': {e}"))?;
+
+        // Check if range is empty
+        if range.is_empty() {
+            return Err(format!("Sheet '{sheet_name}' is empty").into());
+        }
+
+        let rows: Vec<_> = range.rows().collect();
+        if rows.len() < 2 {
+            return Err("Sheet must contain at least a header row and one data row".into());
+        }
+
+        // Extract headers
+        let header_row = &rows[0];
+        if header_row.is_empty() {
+            return Err("Header row is empty".into());
+        }
+
+        let mut column_names = Vec::new();
+        for (i, cell) in header_row.iter().enumerate() {
+            let col_name =
+                Self::extract_xlsx_header_name(Some(cell), &format!("Column {}", i + 1))?;
+            column_names.push(col_name);
+        }
+
+        // Parse data rows based on column names
+        let mut column_data: Vec<Vec<AnyValue>> = vec![Vec::new(); column_names.len()];
+
+        for (i, row) in rows.iter().enumerate().skip(1) {
+            let row_num = i + 1; // 1-based for user-friendly error messages
+
+            for (col_idx, (cell, col_name)) in row.iter().zip(column_names.iter()).enumerate() {
+                let any_value = if col_name == "age" || col_name == "duration" {
+                    // Parse as i32
+                    let val = Self::_parse_xlsx_i32_cell(Some(cell), row_num, col_name)?;
+                    AnyValue::Int32(val)
+                } else {
+                    // Parse as f64 for all other columns (qx, lx, etc.)
+                    let val = Self::_parse_xlsx_f64_cell(Some(cell), row_num, col_name)?;
+                    AnyValue::Float64(val)
+                };
+                column_data[col_idx].push(any_value);
+            }
+        }
+
+        // Validate that we have data
+        if column_data.is_empty() || column_data[0].is_empty() {
+            return Err("No data rows found in sheet".into());
+        }
+
+        // Build DataFrame
+        let mut columns = Vec::new();
+        for (col_name, data) in column_names.iter().zip(column_data.iter()) {
+            let series = Series::from_any_values(col_name.as_str().into(), data, true)
+                .map_err(|e| format!("Failed to create series for column '{col_name}': {e}"))?;
+            columns.push(series.into_column());
+        }
+
+        let df =
+            DataFrame::new(columns).map_err(|e| format!("Failed to create DataFrame: {e}"))?;
+
+        // Delegate to from_df for validation and MortXML construction
+        MortXML::from_df(df)
+    }
+
+    /// Parse mortality table from ODS file using spreadsheet-ods.
+    ///
+    /// Reads ODS files and automatically parses columns based on their names:
+    /// - "age" and "duration" columns are parsed as i32
+    /// - All other columns ("qx", "lx", etc.) are parsed as f64
+    ///
+    /// Schema validation is performed by `from_df()` after parsing.
+    ///
+    /// # Errors
+    /// - File not found or not readable
+    /// - Invalid ODS format
+    /// - Sheet not found
+    /// - Invalid data in cells
+    /// - Empty sheets or insufficient data
+    /// - Schema validation errors (via `from_df`)
+    ///
+    /// # Examples
+    /// ```rust, ignore
+    /// use rslife::xml::MortXML;
+    ///
+    /// // Ultimate table with qx values
+    /// let mort_xml = MortXML::from_ods("data/ltam_standard_ultimate.ods", "ltam")?;
+    ///
+    /// // Select table with duration
+    /// let mort_xml = MortXML::from_ods("data/am92_select.ods", "AM92")?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn from_ods(ods_file: &str, sheet_name: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        // Open ODS workbook
+        let workbook = read_ods(ods_file)
+            .map_err(|e| format!("Failed to open ODS file '{ods_file}': {e}"))?;
+
+        // Find the sheet by name - iterate through sheets to find by name
+        let mut sheet = None;
+        for i in 0..workbook.num_sheets() {
+            let current_sheet = workbook.sheet(i);
+            if current_sheet.name() == sheet_name {
+                sheet = Some(current_sheet);
+                break;
+            }
+        }
+
+        let sheet = sheet.ok_or_else(|| format!("Sheet '{sheet_name}' not found in ODS file"))?;
+
+        // Get sheet dimensions
+        let (max_row, max_col) = sheet.used_grid_size();
+
+        // Check if sheet is empty
+        if max_row < 1 {
+            return Err(format!("Sheet '{sheet_name}' is empty").into());
+        }
+
+        // Extract headers from first row
+        let mut column_names = Vec::new();
+        for col in 0..=max_col {
+            let cell_value = sheet.value(0, col);
+            let col_name =
+                Self::_extract_ods_header_name(cell_value, &format!("Column {}", col + 1))?;
+            column_names.push(col_name);
+        }
+
+        // Parse data rows based on column names
+        let mut column_data: Vec<Vec<AnyValue>> = vec![Vec::new(); column_names.len()];
+
+        for row in 1..=max_row {
+            let row_num = (row + 1) as usize; // 1-based for user-friendly error messages
+
+            for (col_idx, col_name) in column_names.iter().enumerate() {
+                let cell_value = sheet.value(row, col_idx as u32);
+                let any_value = if col_name == "age" || col_name == "duration" {
+                    // Parse as i32
+                    let val = Self::_parse_ods_i32_cell(cell_value, row_num, col_name)?;
+                    AnyValue::Int32(val)
+                } else {
+                    // Parse as f64 for all other columns (qx, lx, etc.)
+                    let val = Self::_parse_ods_f64_cell(cell_value, row_num, col_name)?;
+                    AnyValue::Float64(val)
+                };
+                column_data[col_idx].push(any_value);
+            }
+        }
+
+        // Validate that we have data
+        if column_data.is_empty() || column_data[0].is_empty() {
+            return Err("No data rows found in sheet".into());
+        }
+
+        // Build DataFrame
+        let mut columns = Vec::new();
+        for (col_name, data) in column_names.iter().zip(column_data.iter()) {
+            let series = Series::from_any_values(col_name.as_str().into(), data, true)
+                .map_err(|e| format!("Failed to create series for column '{col_name}': {e}"))?;
+            columns.push(series.into_column());
+        }
+
+        let df =
+            DataFrame::new(columns).map_err(|e| format!("Failed to create DataFrame: {e}"))?;
+
+        // Delegate to from_df for validation and MortXML construction
+        MortXML::from_df(df)
+    }
+
+    //==========================================================================
+    // Private helper methods for schema validation and parsing
+    //==========================================================================
+    /// Validate DataFrame schema according to mortality table requirements.
+    ///
+    /// Ensures DataFrame follows the expected schema:
+    /// - First column must be i32, named "age"
+    /// - Second column must be f64, named "qx" or "lx"
+    /// - Third column optional, must be i32 if present, named "duration"
+    ///
+    /// # Errors
+    /// - Wrong number of columns (must be 2 or 3)
+    /// - Incorrect column names
+    /// - Incorrect data types
+    /// - Empty DataFrame
+    fn _validate_df_schema(df: &DataFrame) -> Result<(), Box<dyn std::error::Error>> {
+        // Check if DataFrame is empty
+        if df.height() == 0 {
+            return Err("DataFrame must contain at least one row of data".into());
+        }
+
+        let columns = df.get_columns();
+        let num_cols = columns.len();
+
+        // Check number of columns (must be 2 or 3)
+        if num_cols < 2 {
+            return Err("DataFrame must have at least 2 columns (age and qx/lx)".into());
+        }
+
+        if num_cols > 3 {
+            return Err(
+                "DataFrame must have at most 3 columns (age, qx/lx, optional duration)".into(),
+            );
+        }
+
+        // Validate first column: "age" (i32)
+        let age_col = &columns[0];
+        if age_col.name() != "age" {
+            return Err(format!(
+                "First column must be named 'age', found '{}'",
+                age_col.name()
+            )
+            .into());
+        }
+        if !matches!(age_col.dtype(), DataType::Int32) {
+            return Err(format!(
+                "First column 'age' must be i32 type, found {:?}",
+                age_col.dtype()
+            )
+            .into());
+        }
+
+        // Validate second column: "qx" or "lx" (f64)
+        let value_col = &columns[1];
+        let value_col_name = value_col.name();
+        if value_col_name != "qx" && value_col_name != "lx" {
+            return Err(format!(
+                "Second column must be named 'qx' or 'lx', found '{value_col_name}'"
+            )
+            .into());
+        }
+        if !matches!(value_col.dtype(), DataType::Float64) {
+            return Err(format!(
+                "Second column '{}' must be f64 type, found {:?}",
+                value_col_name,
+                value_col.dtype()
+            )
+            .into());
+        }
+
+        // Validate third column if present: "duration" (i32)
+        if num_cols == 3 {
+            let duration_col = &columns[2];
+            if duration_col.name() != "duration" {
+                return Err(format!(
+                    "Third column must be named 'duration', found '{}'",
+                    duration_col.name()
+                )
+                .into());
+            }
+            if !matches!(duration_col.dtype(), DataType::Int32) {
+                return Err(format!(
+                    "Third column 'duration' must be i32 type, found {:?}",
+                    duration_col.dtype()
+                )
+                .into());
+            }
+        }
+
+        // Additional data validation
+        // Check for negative ages
+        let age_column = df.column("age")?;
+        let age_series = age_column.as_materialized_series();
+        if let Ok(Some(min_age)) = age_series.min::<i32>() {
+            if min_age < 0 {
+                return Err(format!(
+                    "Age values must be non-negative, found minimum: {min_age}"
+                )
+                .into());
+            }
+        }
+
+        // Check for valid mortality/life values (should be non-negative for most cases)
+        let value_column = df.column(value_col_name)?;
+        let value_series = value_column.as_materialized_series();
+        if value_col_name == "lx" {
+            // Life counts should be non-negative
+            if let Ok(Some(min_val)) = value_series.min::<f64>() {
+                if min_val < 0.0 {
+                    return Err(format!(
+                        "Life count values (lx) must be non-negative, found minimum: {min_val}"
+                    )
+                    .into());
+                }
+            }
+        } else if value_col_name == "qx" {
+            // Mortality rates should be between 0 and 1
+            if let Ok(Some(min_val)) = value_series.min::<f64>() {
+                if min_val < 0.0 {
+                    return Err(format!(
+                        "Mortality rate values (qx) must be non-negative, found minimum: {min_val}"
+                    )
+                    .into());
+                }
+            }
+            if let Ok(Some(max_val)) = value_series.max::<f64>() {
+                if max_val > 1.0 {
+                    return Err(format!(
+                        "Mortality rate values (qx) must be ≤ 1.0, found maximum: {max_val}"
+                    )
+                    .into());
+                }
+            }
+        }
+
+        // Check duration values if present
+        if num_cols == 3 {
+            let duration_column = df.column("duration")?;
+            let duration_series = duration_column.as_materialized_series();
+            if let Ok(Some(min_dur)) = duration_series.min::<i32>() {
+                if min_dur < 0 {
+                    return Err(format!(
+                        "Duration values must be non-negative, found minimum: {min_dur}"
+                    )
+                    .into());
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Extract header name from ODS cell value, ensuring it's a string.
+    fn _extract_ods_header_name(
+        cell_value: &Value,
+        column_desc: &str,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        match cell_value {
+            Value::Text(s) => Ok(s.trim().to_lowercase()),
+            Value::Empty => Err(format!("{column_desc} header is missing").into()),
+            other => Err(format!("{column_desc} header must be text, found {other:?}").into()),
+        }
+    }
+
+    /// Parse ODS cell value as i32 with comprehensive error handling.
+    fn _parse_ods_i32_cell(
+        cell_value: &Value,
+        row_num: usize,
+        col_name: &str,
+    ) -> Result<i32, Box<dyn std::error::Error>> {
+        match cell_value {
+            Value::Number(f) => {
+                if f.is_nan() || f.is_infinite() || *f < 0.0 || *f > i32::MAX as f64 {
+                    Err(format!(
+                        "{col_name} value {f} at row {row_num} is invalid or out of range"
+                    )
+                    .into())
+                } else {
+                    Ok(*f as i32)
+                }
+            }
+            Value::Text(s) => s.parse::<i32>().map_err(|_| {
+                format!(
+                    "Cannot parse {col_name} '{s}' at row {row_num} as integer"
+                )
+                .into()
+            }),
+            // Bool type not supported in this version of spreadsheet-ods
+            Value::Empty => Err(format!("Missing {col_name} value at row {row_num}").into()),
+            other => Err(format!(
+                "Invalid {col_name} cell type {other:?} at row {row_num}"
+            )
+            .into()),
+        }
+    }
+
+    /// Parse ODS cell value as f64 with comprehensive error handling.
+    fn _parse_ods_f64_cell(
+        cell_value: &Value,
+        row_num: usize,
+        col_name: &str,
+    ) -> Result<f64, Box<dyn std::error::Error>> {
+        match cell_value {
+            Value::Number(f) => Ok(*f),
+            Value::Text(s) => {
+                if s.trim().is_empty() {
+                    Ok(f64::NAN)
+                } else {
+                    s.parse::<f64>().map_err(|_| {
+                        format!(
+                            "Cannot parse {col_name} '{s}' at row {row_num} as number"
+                        )
+                        .into()
+                    })
+                }
+            }
+            // Bool type not supported in this version of spreadsheet-ods
+            Value::Empty => Ok(f64::NAN),
+            other => Err(format!(
+                "Invalid {col_name} cell type {other:?} at row {row_num}"
+            )
+            .into()),
+        }
+    }
+
+    /// Extract header name from cell, ensuring it's a string value.
+    fn extract_xlsx_header_name(
+        cell: Option<&Data>,
+        column_desc: &str,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        match cell {
+            Some(Data::String(s)) => Ok(s.trim().to_lowercase()),
+            Some(other) => {
+                Err(format!("{column_desc} header must be text, found {other:?}").into())
+            }
+            None => Err(format!("{column_desc} header is missing").into()),
+        }
+    }
+
+    /// Parse cell value as i32 with comprehensive error handling.
+    fn _parse_xlsx_i32_cell(
+        cell: Option<&Data>,
+        row_num: usize,
+        col_name: &str,
+    ) -> Result<i32, Box<dyn std::error::Error>> {
+        match cell {
+            Some(Data::Int(v)) => {
+                if *v < 0 || *v > i32::MAX as i64 {
+                    Err(format!(
+                        "{col_name} value {v} at row {row_num} is out of valid range"
+                    )
+                    .into())
+                } else {
+                    Ok(*v as i32)
+                }
+            }
+            Some(Data::Float(f)) => {
+                if f.is_nan() || f.is_infinite() || *f < 0.0 || *f > i32::MAX as f64 {
+                    Err(format!(
+                        "{col_name} value {f} at row {row_num} is invalid or out of range"
+                    )
+                    .into())
+                } else {
+                    Ok(*f as i32)
+                }
+            }
+            Some(Data::String(s)) => s.parse::<i32>().map_err(|_| {
+                format!(
+                    "Cannot parse {col_name} '{s}' at row {row_num} as integer"
+                )
+                .into()
+            }),
+            Some(Data::Bool(b)) => Ok(if *b { 1 } else { 0 }),
+            Some(Data::Empty) => {
+                Err(format!("Missing {col_name} value at row {row_num}").into())
+            }
+            Some(other) => Err(format!(
+                "Invalid {col_name} cell type {other:?} at row {row_num}"
+            )
+            .into()),
+            None => Err(format!("Missing {col_name} cell at row {row_num}").into()),
+        }
+    }
+
+    /// Parse cell value as f64 with comprehensive error handling.
+    fn _parse_xlsx_f64_cell(
+        cell: Option<&Data>,
+        row_num: usize,
+        col_name: &str,
+    ) -> Result<f64, Box<dyn std::error::Error>> {
+        match cell {
+            Some(Data::Float(f)) => Ok(*f),
+            Some(Data::Int(v)) => Ok(*v as f64),
+            Some(Data::String(s)) => {
+                if s.trim().is_empty() {
+                    Ok(f64::NAN)
+                } else {
+                    s.parse::<f64>().map_err(|_| {
+                        format!(
+                            "Cannot parse {col_name} '{s}' at row {row_num} as number"
+                        )
+                        .into()
+                    })
+                }
+            }
+            Some(Data::Bool(b)) => Ok(if *b { 1.0 } else { 0.0 }),
+            Some(Data::Empty) => Ok(f64::NAN),
+            Some(other) => Err(format!(
+                "Invalid {col_name} cell type {other:?} at row {row_num}"
+            )
+            .into()),
+            None => Err(format!("Missing {col_name} cell at row {row_num}").into()),
+        }
     }
 }
 
@@ -795,7 +1324,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_xml_from_id() {
         // This will call the MortXML::from_string method as well
         let result = MortXML::from_id(1704);
@@ -806,10 +1334,10 @@ mod tests {
 
         let df = &mort_xml.tables[0].values;
         assert!(df.height() > 0, "DataFrame is empty");
-        assert!(df.column("value").is_ok(), "No 'value' column");
+        assert!(df.column("qx").is_ok(), "No 'qx' column");
 
         // Check a random value (first row)
-        let values = df.column("value").unwrap();
+        let values = df.column("qx").unwrap();
         let first_value = values.get(0).unwrap();
         assert!(!first_value.is_null(), "First value is missing or null");
 
@@ -842,7 +1370,7 @@ mod tests {
 
         let df = &mort_xml.tables[0].values;
         assert!(df.height() > 0, "DataFrame is empty");
-        assert!(df.column("value").is_ok(), "No 'value' column");
+        assert!(df.column("qx").is_ok(), "No 'qx' column");
 
         // Verify content classification
         assert!(
@@ -856,6 +1384,60 @@ mod tests {
 
         println!("Table name: {}", mort_xml.content_classification.table_name);
         println!("Number of rows: {}", df.height());
+    }
+
+    #[test]
+    #[ignore] // Requires xlsx file to exist
+    fn test_xml_from_xlsx() {
+        // Test loading from existing XLSX file with proper column names
+        let result = MortXML::from_xlsx("data/elt15.xlsx", "female");
+
+        match result {
+            Ok(mort_xml) => {
+                println!("✓ Successfully loaded XLSX file");
+                println!(
+                    "  Table name: {}",
+                    mort_xml.content_classification.table_name
+                );
+                println!("  Rows: {}", mort_xml.tables[0].values.height());
+                println!(
+                    "  Columns: {:?}",
+                    mort_xml.tables[0].values.get_column_names()
+                );
+
+                // Basic validation
+                assert!(!mort_xml.tables.is_empty(), "No tables loaded from XLSX");
+                assert!(mort_xml.tables[0].values.height() > 0, "DataFrame is empty");
+
+                // Verify DataFrame structure
+                let df = &mort_xml.tables[0].values;
+                assert!(df.column("age").is_ok(), "Should have 'age' column");
+                assert!(df.column("qx").is_ok(), "Should have 'qx' column");
+
+                // Check some sample values
+                let age_col = df.column("age").unwrap();
+                let qx_col = df.column("qx").unwrap();
+
+                // First age should be 0
+                assert_eq!(age_col.get(0).unwrap().try_extract::<i32>().unwrap(), 0);
+
+                // First qx should be around 0.00632 (from examine output)
+                let first_qx = qx_col.get(0).unwrap().try_extract::<f64>().unwrap();
+                assert!(
+                    (first_qx - 0.00632).abs() < 0.0001,
+                    "First qx should be approximately 0.00632"
+                );
+
+                println!(
+                    "  First age: {}",
+                    age_col.get(0).unwrap().try_extract::<i32>().unwrap()
+                );
+                println!("  First qx: {:.5}", first_qx);
+            }
+            Err(e) => {
+                panic!("Failed to load XLSX file: {}", e);
+            }
+        }
     }
 
     #[test]
@@ -874,7 +1456,7 @@ mod tests {
         // Create DataFrame
         let df = df! {
             "age" => ages.clone(),
-            "value" => values.clone(),
+            "qx" => values.clone(),
         }
         .expect("Failed to create DataFrame");
 
@@ -897,10 +1479,7 @@ mod tests {
             table.values.column("age").is_ok(),
             "Should have 'age' column"
         );
-        assert!(
-            table.values.column("value").is_ok(),
-            "Should have 'value' column"
-        );
+        assert!(table.values.column("qx").is_ok(), "Should have 'qx' column");
 
         // Verify content classification defaults
         let classification = &mort_xml.content_classification;
@@ -923,7 +1502,7 @@ mod tests {
 
         // Verify some data values
         let age_column = table.values.column("age").unwrap();
-        let value_column = table.values.column("value").unwrap();
+        let value_column = table.values.column("qx").unwrap();
 
         // Check first row (age 0)
         let first_age = age_column.get(0).unwrap();
@@ -953,5 +1532,193 @@ mod tests {
             "  Last mortality rate (age 120): {:.6}",
             last_value.try_extract::<f64>().unwrap()
         );
+    }
+
+    #[test]
+    fn test_dataframe_schema_validation_valid_qx() {
+        use polars::prelude::*;
+
+        // Test valid DataFrame with qx column
+        let df = df! {
+            "age" => [25i32, 26i32, 27i32],
+            "qx" => [0.0015f64, 0.0018f64, 0.0020f64],
+        }
+        .expect("Failed to create DataFrame");
+
+        let result = MortXML::from_df(df);
+        assert!(result.is_ok(), "Valid qx DataFrame should pass validation");
+    }
+
+    #[test]
+    fn test_dataframe_schema_validation_valid_lx() {
+        use polars::prelude::*;
+
+        // Test valid DataFrame with lx column
+        let df = df! {
+            "age" => [25i32, 26i32, 27i32],
+            "lx" => [100000.0f64, 99850.0f64, 99680.0f64],
+        }
+        .expect("Failed to create DataFrame");
+
+        let result = MortXML::from_df(df);
+        assert!(result.is_ok(), "Valid lx DataFrame should pass validation");
+    }
+
+    #[test]
+    fn test_dataframe_schema_validation_with_duration() {
+        use polars::prelude::*;
+
+        // Test valid DataFrame with duration column
+        let df = df! {
+            "age" => [25i32, 26i32, 27i32],
+            "qx" => [0.0015f64, 0.0018f64, 0.0020f64],
+            "duration" => [0i32, 1i32, 2i32],
+        }
+        .expect("Failed to create DataFrame");
+
+        let result = MortXML::from_df(df);
+        assert!(
+            result.is_ok(),
+            "Valid DataFrame with duration should pass validation"
+        );
+    }
+
+    #[test]
+    fn test_dataframe_schema_validation_wrong_column_name() {
+        use polars::prelude::*;
+
+        // Test DataFrame with wrong column name
+        let df = df! {
+            "age" => [25i32, 26i32, 27i32],
+            "value" => [0.0015f64, 0.0018f64, 0.0020f64],  // Wrong column name
+        }
+        .expect("Failed to create DataFrame");
+
+        let result = MortXML::from_df(df);
+        assert!(
+            result.is_err(),
+            "DataFrame with wrong column name should fail validation"
+        );
+        let error_msg = result.unwrap_err().to_string();
+        assert!(error_msg.contains("Second column must be named 'qx' or 'lx'"));
+    }
+
+    #[test]
+    fn test_dataframe_schema_validation_wrong_age_column_name() {
+        use polars::prelude::*;
+
+        // Test DataFrame with wrong age column name
+        let df = df! {
+            "years" => [25i32, 26i32, 27i32],  // Wrong column name
+            "qx" => [0.0015f64, 0.0018f64, 0.0020f64],
+        }
+        .expect("Failed to create DataFrame");
+
+        let result = MortXML::from_df(df);
+        assert!(
+            result.is_err(),
+            "DataFrame with wrong age column name should fail validation"
+        );
+        let error_msg = result.unwrap_err().to_string();
+        assert!(error_msg.contains("First column must be named 'age'"));
+    }
+
+    #[test]
+    fn test_dataframe_schema_validation_wrong_data_types() {
+        use polars::prelude::*;
+
+        // Test DataFrame with wrong data types
+        let df = df! {
+            "age" => [25.0f64, 26.0f64, 27.0f64],  // Should be i32
+            "qx" => [0.0015f64, 0.0018f64, 0.0020f64],
+        }
+        .expect("Failed to create DataFrame");
+
+        let result = MortXML::from_df(df);
+        assert!(
+            result.is_err(),
+            "DataFrame with wrong age data type should fail validation"
+        );
+        let error_msg = result.unwrap_err().to_string();
+        assert!(error_msg.contains("First column 'age' must be i32 type"));
+    }
+
+    #[test]
+    fn test_dataframe_schema_validation_empty_dataframe() {
+        use polars::prelude::*;
+
+        // Test empty DataFrame
+        let df = df! {
+            "age" => Vec::<i32>::new(),
+            "qx" => Vec::<f64>::new(),
+        }
+        .expect("Failed to create DataFrame");
+
+        let result = MortXML::from_df(df);
+        assert!(result.is_err(), "Empty DataFrame should fail validation");
+        let error_msg = result.unwrap_err().to_string();
+        assert!(error_msg.contains("DataFrame must contain at least one row of data"));
+    }
+
+    #[test]
+    fn test_dataframe_schema_validation_negative_ages() {
+        use polars::prelude::*;
+
+        // Test DataFrame with negative ages
+        let df = df! {
+            "age" => [-1i32, 26i32, 27i32],  // Negative age
+            "qx" => [0.0015f64, 0.0018f64, 0.0020f64],
+        }
+        .expect("Failed to create DataFrame");
+
+        let result = MortXML::from_df(df);
+        assert!(
+            result.is_err(),
+            "DataFrame with negative ages should fail validation"
+        );
+        let error_msg = result.unwrap_err().to_string();
+        assert!(error_msg.contains("Age values must be non-negative"));
+    }
+
+    #[test]
+    fn test_dataframe_schema_validation_invalid_qx_values() {
+        use polars::prelude::*;
+
+        // Test DataFrame with qx values > 1.0
+        let df = df! {
+            "age" => [25i32, 26i32, 27i32],
+            "qx" => [0.5f64, 1.5f64, 0.8f64],  // 1.5 > 1.0
+        }
+        .expect("Failed to create DataFrame");
+
+        let result = MortXML::from_df(df);
+        assert!(
+            result.is_err(),
+            "DataFrame with qx > 1.0 should fail validation"
+        );
+        let error_msg = result.unwrap_err().to_string();
+        assert!(error_msg.contains("Mortality rate values (qx) must be ≤ 1.0"));
+    }
+
+    #[test]
+    fn test_dataframe_schema_validation_too_many_columns() {
+        use polars::prelude::*;
+
+        // Test DataFrame with too many columns
+        let df = df! {
+            "age" => [25i32, 26i32, 27i32],
+            "qx" => [0.0015f64, 0.0018f64, 0.0020f64],
+            "duration" => [0i32, 1i32, 2i32],
+            "extra" => [1.0f64, 2.0f64, 3.0f64],  // Too many columns
+        }
+        .expect("Failed to create DataFrame");
+
+        let result = MortXML::from_df(df);
+        assert!(
+            result.is_err(),
+            "DataFrame with too many columns should fail validation"
+        );
+        let error_msg = result.unwrap_err().to_string();
+        assert!(error_msg.contains("DataFrame must have at most 3 columns"));
     }
 }

@@ -14,7 +14,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✅ Successfully loaded mortality table!");
     println!("📊 Table: {}", xml.content_classification.table_name);
     println!("📏 Rows: {}", table.values.height());
-    println!("🏷️  Table ID: {}", xml.content_classification.table_identity);
+    println!(
+        "🏷️  Table ID: {}",
+        xml.content_classification.table_identity
+    );
 
     // Show table structure
     let columns = table.values.get_column_names();
