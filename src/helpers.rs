@@ -53,6 +53,7 @@ use polars::prelude::*;
 /// # Example
 /// ```rust
 /// use rslife::prelude::*;
+/// use rslife::helpers::get_value;
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let xml = MortXML::from_url_id(1704)?;
 /// let config = MortTableConfig {

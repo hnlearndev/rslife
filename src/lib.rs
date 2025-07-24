@@ -19,13 +19,14 @@
 //!     xml,
 //!     radix: Some(100_000),
 //!     int_rate: Some(0.03),
-//!     pct: Some(0.01),
-//!     assumption: AssumptionEnum::UDD
+//!     pct: Some(1.0),
+//!     assumption: Some(AssumptionEnum::UDD)
 //! };
 //!
 //! // Calculate actuarial values
-//! let whole_life = Ax(&config, 35)?;
-//! let annuity = aaxn(&config, 35, 1)?;
+//! 
+//! let whole_life = A_x(&config, 35)?;
+//! let annuity = aa_x_n(&config, 35, 1, 1)?;
 //! let survival = tpx(&config, 5.0, 30.0)?;
 //!
 //! println!("Whole life: {:.6}", whole_life);

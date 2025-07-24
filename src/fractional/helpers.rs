@@ -29,6 +29,7 @@ pub fn is_table_layout_approved(config: &MortTableConfig) -> bool {
         "Insured Lives Mortality - Ultimate",
         "Projection Scale",
         "Termination Voluntary",
+        "Population Mortality",
     ];
 
     let content_type = config.xml.content_classification.content_type.clone();
