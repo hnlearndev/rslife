@@ -12,7 +12,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Load mortality data
     println!("Loading mortality table...");
-    let xml = MortXML::from_url_id(1704)?;
+    let xml = MortXML::from_url_id(1705)?;
 
     // Create mortality table configuration
     let config = MortTableConfig {
@@ -30,37 +30,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Performing actuarial calculations...");
 
     // Life insurance calculations
-    let whole_life = A_x(&config, 30)?;
-    let term_20 = A_x1_n(&config, 30, 20)?;
-    let endowment_20 = A_x_n(&config, 30, 20)?;
+    let whole_life = Ax(&config, 30, 0, None)?;
+    let term_20 = Ax1n(&config, 30, 20, 0, None)?;
+    let endowment_20 = Axn(&config, 30, 20, 0, None)?;
 
     println!("Life Insurance (age 30):");
-    println!("  Whole life (A_x): {whole_life:.6}");
-    println!("  20-year term (A_x1_n): {term_20:.6}");
-    println!("  20-year endowment (A_x_n): {endowment_20:.6}");
+    println!("  Whole life (Ax): {whole_life:.6}");
+    println!("  20-year term (Ax1n): {term_20:.6}");
+    println!("  20-year endowment (Axn): {endowment_20:.6}");
     println!();
 
     // Annuity calculations
-    let annuity_annual_due = aa_x_n(&config, 65, 20, 1)?;
-    let annuity_monthly_due = aa_x_n(&config, 65, 20, 12)?;
-    let annuity_annual_immediate = a_x_n(&config, 65, 20, 1)?;
+    let annuity_annual_due = aaxn(&config, 65, 20, 1, 0, None)?;
+    let annuity_monthly_due = aaxn(&config, 65, 20, 12, 0, None)?;
+    let annuity_life_due = aax(&config, 65, 1, 0, None)?;
 
-    println!("Annuities (age 65, 20 years):");
-    println!("  Annual due payments: {annuity_annual_due:.6}");
-    println!("  Monthly due payments: {annuity_monthly_due:.6}");
-    println!("  Annual immediate payments: {annuity_annual_immediate:.6}");
+    println!("Annuities (age 65):");
+    println!("  20-year annual due payments: {annuity_annual_due:.6}");
+    println!("  20-year monthly due payments: {annuity_monthly_due:.6}");
+    println!("  Life annual due payments: {annuity_life_due:.6}");
     println!();
 
-    // Fractional age calculations
-    let survival_half_year = tpx(&config, 0.5, 30.0)?;
-    let mortality_half_year = tqx(&config, 0.5, 30.0)?;
+    // Survival probability calculations
+    let survival_10_years = tpx(&config, 10, 30, None)?;
+    let mortality_10_years = tqx(&config, 10, 30, None)?;
 
-    println!("Fractional age calculations (6 months, age 30):");
-    println!("  Survival probability (tpx): {survival_half_year:.6}");
-    println!("  Mortality probability (tqx): {mortality_half_year:.6}");
+    println!("Survival calculations (10 years, age 30):");
+    println!("  Survival probability (tpx): {survival_10_years:.6}");
+    println!("  Mortality probability (tqx): {mortality_10_years:.6}");
     println!(
         "  Sum (should be 1.0): {:.6}",
-        survival_half_year + mortality_half_year
+        survival_10_years + mortality_10_years
     );
     println!();
 

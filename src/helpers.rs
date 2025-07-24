@@ -81,7 +81,7 @@ use polars::prelude::*;
 /// - The requested age is not found in the table
 /// - The requested column does not exist
 /// - Interest rate is required but not provided for levels 2-4
-pub fn get_value(config: &MortTableConfig, x: i32, column_name: &str) -> PolarsResult<f64> {
+pub fn get_value(config: &MortTableConfig, x: u32, column_name: &str) -> PolarsResult<f64> {
     // Determine the minimum detail level required for this column
     let detail_level = match column_name {
         // Level 1: Basic demographic functions
@@ -133,6 +133,129 @@ pub fn get_value(config: &MortTableConfig, x: i32, column_name: &str) -> PolarsR
     })?;
 
     Ok(value)
+}
+
+pub fn get_new_config_geometric_functions(
+    config: &MortTableConfig,
+    g: f64,
+) -> PolarsResult<MortTableConfig> {
+    // Replace the effective interest rate with the adjusted one
+    let i = config.int_rate.unwrap();
+    let int_rate = (1.0 + i) / (1.0 + g) - 1.0;
+    let mut new_config = config.clone();
+    new_config.int_rate = Some(int_rate);
+    Ok(new_config)
+}
+
+pub fn get_new_config_with_selected_table(
+    config: &MortTableConfig,
+    entry_age: Option<u32>,
+) -> PolarsResult<MortTableConfig> {
+    if !_is_table_layout_approved(config) {
+        return Err(PolarsError::InvalidOperation(
+            "Mortality table layout is not approved".into(),
+        ));
+    }
+
+    // If entry age is Some, use selected table; otherwise, use ultimate table
+    let selected_df = if let Some(age) = entry_age {
+        _get_selected_mortality_table(config, age)?
+    } else {
+        _get_ultimate_mortality_table(config)?
+    };
+
+    // Create a new MortTableConfig with the modified DataFrame
+    let mut new_config = config.clone();
+    new_config.xml.tables[0].values = selected_df;
+
+    Ok(new_config)
+}
+
+fn _is_table_layout_approved(config: &MortTableConfig) -> bool {
+    // Check table layout
+    let approved_table_layouts = ["Select", "Select & Ultimate"];
+    let key_words = config.xml.content_classification.key_words.clone();
+
+    // Check if any keyword matches any approved table layout
+    key_words.iter().any(|keyword| {
+        approved_table_layouts
+            .iter()
+            .any(|layout| keyword == layout)
+    })
+}
+
+fn _get_ultimate_mortality_table(config: &MortTableConfig) -> PolarsResult<DataFrame> {
+    // If entry age is None, we will use the highest duration as ultimate rate
+    let df = &config.xml.tables[0].values;
+    let max_duration = df.column("duration")?.u32()?.max().unwrap();
+    let value_column_name = df.get_column_names()[1].as_str();
+
+    df.clone()
+        .lazy()
+        .filter(col("duration").eq(lit(max_duration)))
+        .select([col("age"), col(value_column_name)])
+        .collect()
+}
+
+fn _get_selected_mortality_table(
+    config: &MortTableConfig,
+    entry_age: u32,
+) -> PolarsResult<DataFrame> {
+    // If entry age is Some, we will generate a new mortality table
+    let df = &config.xml.tables[0].values;
+
+    let min_age = df.column("age")?.u32()?.min().unwrap();
+    let max_age = df.column("age")?.u32()?.max().unwrap();
+    let min_duration = df.column("duration")?.u32()?.min().unwrap();
+    let max_duration = df.column("duration")?.u32()?.max().unwrap();
+    let value_column_name = df.get_column_names()[1].as_str();
+
+    // Entry age cannot be smaller than smallest age in table
+    if entry_age < min_age {
+        return Err(PolarsError::ComputeError(
+            format!("Entry age {entry_age} cannot be less than minimum age {min_age}").into(),
+        ));
+    }
+
+    // Form a new mortality table with axis as
+    // entry age at  duration 0,
+    // entry age + 1 at duration 1 , ...
+    // entry age + t - 1 at duration t-1
+    // entry age + t ultimate
+    // Note: if there is no  duration 0, the smallest duration will be used
+    let mut age_vec: Vec<u32> = Vec::new();
+    let mut value_vec: Vec<f64> = Vec::new();
+
+    let mut duration = min_duration;
+
+    for age in entry_age..max_age {
+        let value_column = df
+            .clone()
+            .lazy()
+            .filter(col("age").eq(lit(age)))
+            .filter(col("duration").eq(lit(duration)))
+            .select([col(value_column_name)])
+            .collect()?;
+
+        let value = value_column
+            .column(value_column_name)?
+            .f64()?
+            .get(0)
+            .unwrap();
+
+        age_vec.push(age);
+        value_vec.push(value);
+
+        duration = u32::min(duration + 1, max_duration); // Cap duration to max_duration
+    }
+
+    // Create a new DataFrame with the selected ages and qx values
+    let result = DataFrame::new(vec![
+        Series::new("age".into(), age_vec).into_column(),
+        Series::new(value_column_name.into(), value_vec).into_column(),
+    ])?;
+
+    Ok(result)
 }
 
 #[cfg(test)]

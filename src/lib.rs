@@ -24,7 +24,7 @@
 //! };
 //!
 //! // Calculate actuarial values
-//! 
+//!
 //! let whole_life = A_x(&config, 35)?;
 //! let annuity = aa_x_n(&config, 35, 1, 1)?;
 //! let survival = tpx(&config, 5.0, 30.0)?;
@@ -82,6 +82,5 @@ pub mod fractional;
 pub mod helpers;
 pub mod mt_config;
 pub mod prelude;
-pub mod selection;
 pub mod whole;
 pub mod xml;

@@ -62,26 +62,24 @@ fn test_prelude_function_signatures() {
     // Test that actuarial functions are accessible and have correct signatures
     // We verify they exist by getting their function pointers
 
-    // Immediate life insurance functions
-    let _a_x_fn = A_x as fn(&MortTableConfig, i32) -> PolarsResult<f64>;
-    let _a_x_n_fn = A_x_n as fn(&MortTableConfig, i32, i32) -> PolarsResult<f64>;
-    let _a_x1_n_fn = A_x1_n as fn(&MortTableConfig, i32, i32) -> PolarsResult<f64>;
-
-    // Due life insurance functions
-    let _aa_x_fn = AA_x as fn(&MortTableConfig, i32) -> PolarsResult<f64>;
-    let _aa_x_n_fn = AA_x_n as fn(&MortTableConfig, i32, i32) -> PolarsResult<f64>;
-
-    // Deferred immediate insurance functions
-    let _t_a_x_fn = t_A_x as fn(&MortTableConfig, i32, i32) -> PolarsResult<f64>;
-    let _t_a_x_n_fn = t_A_x_n as fn(&MortTableConfig, i32, i32, i32) -> PolarsResult<f64>;
+    // Life insurance functions
+    let _ax_fn = Ax as fn(&MortTableConfig, u32, u32, Option<u32>) -> PolarsResult<f64>;
+    let _ax1n_fn = Ax1n as fn(&MortTableConfig, u32, u32, u32, Option<u32>) -> PolarsResult<f64>;
+    let _axn_fn = Axn as fn(&MortTableConfig, u32, u32, u32, Option<u32>) -> PolarsResult<f64>;
+    let _nex_fn = nEx as fn(&MortTableConfig, u32, u32, u32, Option<u32>) -> PolarsResult<f64>;
 
     // Increasing insurance functions
-    let _ia_x_fn = IA_x as fn(&MortTableConfig, i32) -> PolarsResult<f64>;
-    let _ia_x_n_fn = IA_x_n as fn(&MortTableConfig, i32, i32) -> PolarsResult<f64>;
+    let _iax_fn = IAx as fn(&MortTableConfig, u32, u32, Option<u32>) -> PolarsResult<f64>;
+    let _iax1n_fn = IAx1n as fn(&MortTableConfig, u32, u32, u32, Option<u32>) -> PolarsResult<f64>;
+    let _iaxn_fn = IAxn as fn(&MortTableConfig, u32, u32, u32, Option<u32>) -> PolarsResult<f64>;
+
+    // Decreasing insurance functions
+    let _dax1n_fn = DAx1n as fn(&MortTableConfig, u32, u32, u32, Option<u32>) -> PolarsResult<f64>;
+    let _daxn_fn = DAxn as fn(&MortTableConfig, u32, u32, u32, Option<u32>) -> PolarsResult<f64>;
 
     // Geometric insurance functions
-    let _ga_x_fn = gA_x as fn(&MortTableConfig, i32, f64) -> PolarsResult<f64>;
-    let _ga_x_n_fn = gA_x_n as fn(&MortTableConfig, i32, i32, f64) -> PolarsResult<f64>;
+    let _gax_fn = gAx as fn(&MortTableConfig, u32, f64, u32, Option<u32>) -> PolarsResult<f64>;
+    let _gax1n_fn = gAx1n as fn(&MortTableConfig, u32, u32, f64, u32, Option<u32>) -> PolarsResult<f64>;
 
     println!("✓ All life insurance functions accessible through prelude");
 }
@@ -90,29 +88,20 @@ fn test_prelude_function_signatures() {
 fn test_prelude_annuity_functions() {
     // Test annuity function signatures
 
-    // Due annuity functions
-    let _aa_x_fn = aa_x as fn(&MortTableConfig, i32, i32) -> PolarsResult<f64>;
-    let _aa_x_n_fn = aa_x_n as fn(&MortTableConfig, i32, i32, i32) -> PolarsResult<f64>;
-
-    // Immediate annuity functions
-    let _a_x_fn = a_x as fn(&MortTableConfig, i32, i32) -> PolarsResult<f64>;
-    let _a_x_n_fn = a_x_n as fn(&MortTableConfig, i32, i32, i32) -> PolarsResult<f64>;
-
-    // Deferred due annuity functions
-    let _t_aa_x_fn = t_aa_x as fn(&MortTableConfig, i32, i32, i32) -> PolarsResult<f64>;
-    let _t_aa_x_n_fn = t_aa_x_n as fn(&MortTableConfig, i32, i32, i32, i32) -> PolarsResult<f64>;
-
-    // Deferred immediate annuity functions
-    let _t_a_x_fn = t_a_x as fn(&MortTableConfig, i32, i32, i32) -> PolarsResult<f64>;
-    let _t_a_x_n_fn = t_a_x_n as fn(&MortTableConfig, i32, i32, i32, i32) -> PolarsResult<f64>;
+    // Basic annuity functions
+    let _aax_fn = aax as fn(&MortTableConfig, u32, u32, u32, Option<u32>) -> PolarsResult<f64>;
+    let _aaxn_fn = aaxn as fn(&MortTableConfig, u32, u32, u32, u32, Option<u32>) -> PolarsResult<f64>;
 
     // Increasing annuity functions
-    let _iaa_x_fn = Iaa_x as fn(&MortTableConfig, i32, i32) -> PolarsResult<f64>;
-    let _ia_x_fn = Ia_x as fn(&MortTableConfig, i32, i32) -> PolarsResult<f64>;
+    let _iaax_fn = Iaax as fn(&MortTableConfig, u32, u32, u32, Option<u32>) -> PolarsResult<f64>;
+    let _iaaxn_fn = Iaaxn as fn(&MortTableConfig, u32, u32, u32, u32, Option<u32>) -> PolarsResult<f64>;
+
+    // Decreasing annuity functions
+    let _daaxn_fn = Daaxn as fn(&MortTableConfig, u32, u32, u32, u32, Option<u32>) -> PolarsResult<f64>;
 
     // Geometric annuity functions
-    let _gaa_x_fn = gaa_x as fn(&MortTableConfig, i32, i32, f64) -> PolarsResult<f64>;
-    let _ga_x_fn = ga_x as fn(&MortTableConfig, i32, i32, f64) -> PolarsResult<f64>;
+    let _gaax_fn = gaax as fn(&MortTableConfig, u32, u32, f64, u32, Option<u32>) -> PolarsResult<f64>;
+    let _gaaxn_fn = gaaxn as fn(&MortTableConfig, u32, u32, u32, f64, u32, Option<u32>) -> PolarsResult<f64>;
 
     println!("✓ All annuity functions accessible through prelude");
 }
@@ -120,8 +109,8 @@ fn test_prelude_annuity_functions() {
 #[test]
 fn test_prelude_fractional_age_functions() {
     // Test fractional age function signatures
-    let _tpx_fn = tpx as fn(&MortTableConfig, f64, f64) -> PolarsResult<f64>;
-    let _tqx_fn = tqx as fn(&MortTableConfig, f64, f64) -> PolarsResult<f64>;
+    let _tpx_fn = tpx as fn(&MortTableConfig, u32, u32, Option<u32>) -> PolarsResult<f64>;
+    let _tqx_fn = tqx as fn(&MortTableConfig, u32, u32, Option<u32>) -> PolarsResult<f64>;
 
     println!("✓ Fractional age functions (tpx, tqx) accessible through prelude");
 }
@@ -136,23 +125,23 @@ fn test_prelude_comprehensive_functionality() {
 
     // Verify we can reference all the function types we need
     let _life_insurance_functions = [
-        std::any::type_name_of_val(&(A_x as fn(&MortTableConfig, i32) -> PolarsResult<f64>)),
-        std::any::type_name_of_val(&(A_x_n as fn(&MortTableConfig, i32, i32) -> PolarsResult<f64>)),
+        std::any::type_name_of_val(&(Ax as fn(&MortTableConfig, u32, u32, Option<u32>) -> PolarsResult<f64>)),
+        std::any::type_name_of_val(&(Axn as fn(&MortTableConfig, u32, u32, u32, Option<u32>) -> PolarsResult<f64>)),
         std::any::type_name_of_val(
-            &(A_x1_n as fn(&MortTableConfig, i32, i32) -> PolarsResult<f64>),
+            &(Ax1n as fn(&MortTableConfig, u32, u32, u32, Option<u32>) -> PolarsResult<f64>),
         ),
     ];
 
     let _annuity_functions = [
-        std::any::type_name_of_val(&(aa_x as fn(&MortTableConfig, i32, i32) -> PolarsResult<f64>)),
+        std::any::type_name_of_val(&(aax as fn(&MortTableConfig, u32, u32, u32, Option<u32>) -> PolarsResult<f64>)),
         std::any::type_name_of_val(
-            &(t_aa_x as fn(&MortTableConfig, i32, i32, i32) -> PolarsResult<f64>),
+            &(aaxn as fn(&MortTableConfig, u32, u32, u32, u32, Option<u32>) -> PolarsResult<f64>),
         ),
     ];
 
     let _fractional_functions = [
-        std::any::type_name_of_val(&(tpx as fn(&MortTableConfig, f64, f64) -> PolarsResult<f64>)),
-        std::any::type_name_of_val(&(tqx as fn(&MortTableConfig, f64, f64) -> PolarsResult<f64>)),
+        std::any::type_name_of_val(&(tpx as fn(&MortTableConfig, u32, u32, Option<u32>) -> PolarsResult<f64>)),
+        std::any::type_name_of_val(&(tqx as fn(&MortTableConfig, u32, u32, Option<u32>) -> PolarsResult<f64>)),
     ];
 
     println!("✓ All function categories successfully imported");
@@ -174,21 +163,21 @@ fn test_prelude_with_real_data() {
     };
 
     // Verify that our function exports are accessible (without calling problematic ones)
-    let _a_x_fn = A_x;
-    let _a_x_n_fn = A_x_n;
-    let _aa_x_fn = aa_x;
-    let _t_a_x_fn = t_a_x;
-    let _ia_x_fn = IA_x;
-    let _gaa_x_fn = gaa_x;
+    let _ax_fn = Ax;
+    let _axn_fn = Axn;
+    let _aax_fn = aax;
+    let _tpx_fn = tpx;
+    let _iax_fn = IAx;
+    let _gaax_fn = gaax;
 
     // Test function type signatures
-    let _test_a_x = A_x as fn(&MortTableConfig, i32) -> PolarsResult<f64>;
-    let _test_aa_x_n = aa_x_n as fn(&MortTableConfig, i32, i32, i32) -> PolarsResult<f64>;
-    let _test_t_ia_x = t_Ia_x as fn(&MortTableConfig, i32, i32, i32) -> PolarsResult<f64>;
+    let _test_ax = Ax as fn(&MortTableConfig, u32, u32, Option<u32>) -> PolarsResult<f64>;
+    let _test_aaxn = aaxn as fn(&MortTableConfig, u32, u32, u32, u32, Option<u32>) -> PolarsResult<f64>;
+    let _test_tpx = tpx as fn(&MortTableConfig, u32, u32, Option<u32>) -> PolarsResult<f64>;
 
     println!("✓ XML loading works through prelude");
     println!("✓ Function exports are accessible");
     println!("✓ Function type signatures are correct");
-    println!("✓ All {0} benefit functions imported", 60);
-    println!("✓ All {0} annuity functions imported", 28);
+    println!("✓ All {0} benefit functions imported", 13);
+    println!("✓ All {0} annuity functions imported", 7);
 }

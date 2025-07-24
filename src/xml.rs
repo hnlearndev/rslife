@@ -77,11 +77,11 @@ pub struct AxisDef {
     /// Human-readable name for this axis
     pub axis_name: String,
     /// Minimum value on this axis (inclusive)
-    pub min_scale_value: i32,
+    pub min_scale_value: u32,
     /// Maximum value on this axis (inclusive)
-    pub max_scale_value: i32,
+    pub max_scale_value: u32,
     /// Step size between consecutive values
-    pub increment: i32,
+    pub increment: u32,
 }
 
 /// Mortality table metadata container.
@@ -523,8 +523,7 @@ impl MortXML {
             columns.push(series.into_column());
         }
 
-        let df =
-            DataFrame::new(columns).map_err(|e| format!("Failed to create DataFrame: {e}"))?;
+        let df = DataFrame::new(columns).map_err(|e| format!("Failed to create DataFrame: {e}"))?;
 
         // Delegate to from_df for validation and MortXML construction
         MortXML::from_df(df)
@@ -559,8 +558,8 @@ impl MortXML {
     /// ```
     pub fn from_ods(ods_file: &str, sheet_name: &str) -> Result<Self, Box<dyn std::error::Error>> {
         // Open ODS workbook
-        let workbook = read_ods(ods_file)
-            .map_err(|e| format!("Failed to open ODS file '{ods_file}': {e}"))?;
+        let workbook =
+            read_ods(ods_file).map_err(|e| format!("Failed to open ODS file '{ods_file}': {e}"))?;
 
         // Find the sheet by name - iterate through sheets to find by name
         let mut sheet = None;
@@ -625,8 +624,7 @@ impl MortXML {
             columns.push(series.into_column());
         }
 
-        let df =
-            DataFrame::new(columns).map_err(|e| format!("Failed to create DataFrame: {e}"))?;
+        let df = DataFrame::new(columns).map_err(|e| format!("Failed to create DataFrame: {e}"))?;
 
         // Delegate to from_df for validation and MortXML construction
         MortXML::from_df(df)
@@ -667,7 +665,7 @@ impl MortXML {
             );
         }
 
-        // Validate first column: "age" (i32)
+        // Validate first column: "age" (must be u32 for strict typing)
         let age_col = &columns[0];
         if age_col.name() != "age" {
             return Err(format!(
@@ -676,9 +674,9 @@ impl MortXML {
             )
             .into());
         }
-        if !matches!(age_col.dtype(), DataType::Int32) {
+        if !matches!(age_col.dtype(), DataType::UInt32) {
             return Err(format!(
-                "First column 'age' must be i32 type, found {:?}",
+                "First column 'age' must be u32 type, found {:?}",
                 age_col.dtype()
             )
             .into());
@@ -702,7 +700,7 @@ impl MortXML {
             .into());
         }
 
-        // Validate third column if present: "duration" (i32)
+        // Validate third column if present: "duration" (must be u32 for strict typing)
         if num_cols == 3 {
             let duration_col = &columns[2];
             if duration_col.name() != "duration" {
@@ -712,9 +710,9 @@ impl MortXML {
                 )
                 .into());
             }
-            if !matches!(duration_col.dtype(), DataType::Int32) {
+            if !matches!(duration_col.dtype(), DataType::UInt32) {
                 return Err(format!(
-                    "Third column 'duration' must be i32 type, found {:?}",
+                    "Third column 'duration' must be u32 type, found {:?}",
                     duration_col.dtype()
                 )
                 .into());
@@ -727,10 +725,9 @@ impl MortXML {
         let age_series = age_column.as_materialized_series();
         if let Ok(Some(min_age)) = age_series.min::<i32>() {
             if min_age < 0 {
-                return Err(format!(
-                    "Age values must be non-negative, found minimum: {min_age}"
-                )
-                .into());
+                return Err(
+                    format!("Age values must be non-negative, found minimum: {min_age}").into(),
+                );
             }
         }
 
@@ -805,26 +802,20 @@ impl MortXML {
         match cell_value {
             Value::Number(f) => {
                 if f.is_nan() || f.is_infinite() || *f < 0.0 || *f > i32::MAX as f64 {
-                    Err(format!(
-                        "{col_name} value {f} at row {row_num} is invalid or out of range"
+                    Err(
+                        format!("{col_name} value {f} at row {row_num} is invalid or out of range")
+                            .into(),
                     )
-                    .into())
                 } else {
                     Ok(*f as i32)
                 }
             }
             Value::Text(s) => s.parse::<i32>().map_err(|_| {
-                format!(
-                    "Cannot parse {col_name} '{s}' at row {row_num} as integer"
-                )
-                .into()
+                format!("Cannot parse {col_name} '{s}' at row {row_num} as integer").into()
             }),
             // Bool type not supported in this version of spreadsheet-ods
             Value::Empty => Err(format!("Missing {col_name} value at row {row_num}").into()),
-            other => Err(format!(
-                "Invalid {col_name} cell type {other:?} at row {row_num}"
-            )
-            .into()),
+            other => Err(format!("Invalid {col_name} cell type {other:?} at row {row_num}").into()),
         }
     }
 
@@ -841,19 +832,13 @@ impl MortXML {
                     Ok(f64::NAN)
                 } else {
                     s.parse::<f64>().map_err(|_| {
-                        format!(
-                            "Cannot parse {col_name} '{s}' at row {row_num} as number"
-                        )
-                        .into()
+                        format!("Cannot parse {col_name} '{s}' at row {row_num} as number").into()
                     })
                 }
             }
             // Bool type not supported in this version of spreadsheet-ods
             Value::Empty => Ok(f64::NAN),
-            other => Err(format!(
-                "Invalid {col_name} cell type {other:?} at row {row_num}"
-            )
-            .into()),
+            other => Err(format!("Invalid {col_name} cell type {other:?} at row {row_num}").into()),
         }
     }
 
@@ -880,38 +865,32 @@ impl MortXML {
         match cell {
             Some(Data::Int(v)) => {
                 if *v < 0 || *v > i32::MAX as i64 {
-                    Err(format!(
-                        "{col_name} value {v} at row {row_num} is out of valid range"
+                    Err(
+                        format!("{col_name} value {v} at row {row_num} is out of valid range")
+                            .into(),
                     )
-                    .into())
                 } else {
                     Ok(*v as i32)
                 }
             }
             Some(Data::Float(f)) => {
                 if f.is_nan() || f.is_infinite() || *f < 0.0 || *f > i32::MAX as f64 {
-                    Err(format!(
-                        "{col_name} value {f} at row {row_num} is invalid or out of range"
+                    Err(
+                        format!("{col_name} value {f} at row {row_num} is invalid or out of range")
+                            .into(),
                     )
-                    .into())
                 } else {
                     Ok(*f as i32)
                 }
             }
             Some(Data::String(s)) => s.parse::<i32>().map_err(|_| {
-                format!(
-                    "Cannot parse {col_name} '{s}' at row {row_num} as integer"
-                )
-                .into()
+                format!("Cannot parse {col_name} '{s}' at row {row_num} as integer").into()
             }),
             Some(Data::Bool(b)) => Ok(if *b { 1 } else { 0 }),
-            Some(Data::Empty) => {
-                Err(format!("Missing {col_name} value at row {row_num}").into())
+            Some(Data::Empty) => Err(format!("Missing {col_name} value at row {row_num}").into()),
+            Some(other) => {
+                Err(format!("Invalid {col_name} cell type {other:?} at row {row_num}").into())
             }
-            Some(other) => Err(format!(
-                "Invalid {col_name} cell type {other:?} at row {row_num}"
-            )
-            .into()),
             None => Err(format!("Missing {col_name} cell at row {row_num}").into()),
         }
     }
@@ -930,19 +909,15 @@ impl MortXML {
                     Ok(f64::NAN)
                 } else {
                     s.parse::<f64>().map_err(|_| {
-                        format!(
-                            "Cannot parse {col_name} '{s}' at row {row_num} as number"
-                        )
-                        .into()
+                        format!("Cannot parse {col_name} '{s}' at row {row_num} as number").into()
                     })
                 }
             }
             Some(Data::Bool(b)) => Ok(if *b { 1.0 } else { 0.0 }),
             Some(Data::Empty) => Ok(f64::NAN),
-            Some(other) => Err(format!(
-                "Invalid {col_name} cell type {other:?} at row {row_num}"
-            )
-            .into()),
+            Some(other) => {
+                Err(format!("Invalid {col_name} cell type {other:?} at row {row_num}").into())
+            }
             None => Err(format!("Missing {col_name} cell at row {row_num}").into()),
         }
     }
@@ -1142,21 +1117,21 @@ fn create_axis_def(axis_def_node: &roxmltree::Node) -> Result<AxisDef, Box<dyn s
         .descendants()
         .find(|n| n.tag_name().name() == "MinScaleValue")
         .and_then(|n| n.text())
-        .and_then(|t| t.parse::<i32>().ok())
+        .and_then(|t| t.parse::<u32>().ok())
         .unwrap_or(0);
 
     let max_scale_value = axis_def_node
         .descendants()
         .find(|n| n.tag_name().name() == "MaxScaleValue")
         .and_then(|n| n.text())
-        .and_then(|t| t.parse::<i32>().ok())
+        .and_then(|t| t.parse::<u32>().ok())
         .unwrap_or(0);
 
     let increment = axis_def_node
         .descendants()
         .find(|n| n.tag_name().name() == "Increment")
         .and_then(|n| n.text())
-        .and_then(|t| t.parse::<i32>().ok())
+        .and_then(|t| t.parse::<u32>().ok())
         .unwrap_or(1);
 
     let result = AxisDef {
@@ -1173,8 +1148,8 @@ fn create_axis_def(axis_def_node: &roxmltree::Node) -> Result<AxisDef, Box<dyn s
 /// Parse table values into Polars DataFrame with age, duration, and value columns.
 /// Handles both 1D (age only) and 2D (age+duration) table formats.
 fn create_values(table_node: &roxmltree::Node) -> Result<DataFrame, Box<dyn std::error::Error>> {
-    let mut ages: Vec<Option<i32>> = Vec::new();
-    let mut durations: Vec<Option<i32>> = Vec::new();
+    let mut ages: Vec<Option<u32>> = Vec::new();
+    let mut durations: Vec<Option<u32>> = Vec::new();
     let mut values: Vec<f64> = Vec::new();
 
     let axis_nodes = table_node
@@ -1190,7 +1165,7 @@ fn create_values(table_node: &roxmltree::Node) -> Result<DataFrame, Box<dyn std:
 
     let mut columns_vec: Vec<Column> = Vec::new();
 
-    // ages vector
+    // ages vector - keep as u32 for type safety
     if ages.iter().any(|age| age.is_some()) {
         columns_vec.push(Series::new("age".into(), ages.clone()).into_column());
     }
@@ -1210,7 +1185,7 @@ fn create_values(table_node: &roxmltree::Node) -> Result<DataFrame, Box<dyn std:
 
     columns_vec.push(Series::new(value_column_name.into(), values.clone()).into_column());
 
-    // durations vector (optional)
+    // durations vector (optional) - keep as u32 for type safety
     if durations.iter().any(|duration| duration.is_some()) {
         columns_vec.push(Series::new("duration".into(), durations.clone()).into_column());
     }
@@ -1231,16 +1206,16 @@ fn create_values(table_node: &roxmltree::Node) -> Result<DataFrame, Box<dyn std:
     Ok(result)
 }
 
-type AxisValues = (Vec<Option<i32>>, Vec<Option<i32>>, Vec<f64>);
+type AxisValues = (Vec<Option<u32>>, Vec<Option<u32>>, Vec<f64>);
 
 /// Extract mortality values from single Axis element.
 /// Returns (ages, durations, values) where durations may be None for 1D tables.
 fn get_axis_values(axis_node: &roxmltree::Node) -> Result<AxisValues, Box<dyn std::error::Error>> {
-    let mut ages: Vec<Option<i32>> = Vec::new();
-    let mut durations: Vec<Option<i32>> = Vec::new();
+    let mut ages: Vec<Option<u32>> = Vec::new();
+    let mut durations: Vec<Option<u32>> = Vec::new();
     let mut values: Vec<f64> = Vec::new();
 
-    let row_t = axis_node.attribute("t").and_then(|t| t.parse::<i32>().ok());
+    let row_t = axis_node.attribute("t").and_then(|t| t.parse::<u32>().ok());
 
     let y_nodes = axis_node
         .descendants()
@@ -1257,7 +1232,7 @@ fn get_axis_values(axis_node: &roxmltree::Node) -> Result<AxisValues, Box<dyn st
 
         let value = value.unwrap();
 
-        let col_t = node.attribute("t").and_then(|t| t.parse::<i32>().ok());
+        let col_t = node.attribute("t").and_then(|t| t.parse::<u32>().ok());
 
         match row_t {
             Some(age) => {

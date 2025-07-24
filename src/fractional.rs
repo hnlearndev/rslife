@@ -1,6 +1,6 @@
+#![allow(non_snake_case)]
+
 // Define module structure
-pub mod annuities;
-pub mod benefits;
 mod helpers;
 pub mod survivals;
 

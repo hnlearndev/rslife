@@ -1,5 +1,22 @@
 # CHANGE LOG FOR RSLIFE PACKAGE
 
+## [0.1.3] - 2025-07-24
+
+### Changed in v0.1.3
+
+- **Unified API Interface**: Rationalized function signatures across all modules with clear, consistent parameter requirements for enhanced usability.
+- **Improved Configuration Integration**: Enhanced `config` and argument integration throughout the library, making the API more intuitive and reducing repetitive code patterns.
+- **Enhanced Documentation**: Updated function documentation to reflect the unified API approach and improved clarity for developers.
+
+### Fixed
+
+- Consistent parameter ordering across all actuarial functions for better developer experience.
+- Streamlined function exports and module organization.
+
+### Note
+
+- This version continues the API stabilization begun in v0.1.2, focusing on unifying the interface patterns across all function categories.
+
 ## [0.1.2] - 2025-07-23
 
 ### Changed in v0.1.2

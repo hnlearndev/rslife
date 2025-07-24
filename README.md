@@ -8,11 +8,12 @@ A comprehensive Rust library for actuarial mortality table calculations and life
 
 ## Features
 
+- **Unified API Interface**: Consistent and clear parameter requirements across all actuarial functions for enhanced usability
 - **Performance Optimized**: 4-level detail system automatically optimizes calculations for your needs
 - **XML Parsing**: Load mortality data from Society of Actuaries (SOA) XML sources using ACORD XTbML standard
 - **Multiple Mortality Assumptions**: UDD, CFM, and HPB methods for fractional age calculations
 - **Comprehensive Functions**: Life insurance, annuities, and demographic calculations
-- **Standard Notation**: Follows traditional actuarial notation (Ax, äx, etc.)
+- **Standard Notation**: Follows traditional actuarial notation with modern Rust conventions
 - **Polars Integration**: Built on Polars DataFrames for efficient data processing
 - **Well-Documented**: Extensive documentation with mathematical formulations
 
@@ -42,9 +43,9 @@ fn main() -> PolarsResult<()> {
     };
 
     // Calculate actuarial values
-    let whole_life = A_x(&config, 35)?;
-    let annuity = aa_x_n(&config, 35, 1)?;
-    let survival = tpx(&config, 5.0, 30.0)?;
+    let whole_life = Ax(&config, 35, 0, None)?;
+    let annuity = aaxn(&config, 35, 1, 1, 0, None)?;
+    let survival = tpx(&config, 5.0, 30.0, None)?;
 
     println!("Whole life: {:.6}", whole_life);
     println!("Annuity: {:.6}", annuity);
@@ -77,7 +78,7 @@ fn main() -> PolarsResult<()> {
         assumption: AssumptionEnum::UDD
     };
 
-    let insurance_value = A_x(&config, 30)?;
+    let insurance_value = Ax(&config, 30, 0, None)?;
 
     println!("Custom table insurance value: {:.6}", insurance_value);
 
@@ -136,31 +137,30 @@ Hyperbolic interpolation:
 
 The library provides 88+ actuarial functions following systematic naming patterns based on standard actuarial notation:
 
-![Function Naming Convention](diagrams/function_convention-benefits.drawio.gif)
 
 ### Function Structure
 
 **Base Patterns**:
 
-- `A_x` (insurance)
-- `aa_x_n` (annuities)
+- `Ax` (insurance)
+- `aaxn` (annuities)
 - `tpx` (survival)
 
 **Systematic Modifiers**:
 
-- **Due**: Double letter → `AA_x`, `aa_x` (payments at start)
-- **Increasing**: `I` prefix → `IA_x`, `Iaa_x` (arithmetic growth)
-- **Decreasing**: `D` prefix → `DA_x`, `Daa_x` (arithmetic decrease)
-- **Geometric**: `g` prefix → `gA_x`, `gaa_x` (geometric growth)
-- **Deferred**: `t_` prefix → `t_A_x`, `t_aa_x` (delayed start)
-- **Selection**: `_` suffix → `A_x_`, `tpx_` (select mortality tables)
+- **Due**: Double letter → `aax`, `aaxn` (payments at start)
+- **Increasing**: `I` prefix → `IAx`, `Iaax` (arithmetic growth)
+- **Decreasing**: `D` prefix → `DAx1n`, `Daaxn` (arithmetic decrease)
+- **Geometric**: `g` prefix → `gAx`, `gaax` (geometric growth)
+- **Deferred**: `t_` prefix → deferred versions available
+- **Selection**: `_` suffix → selection variants available
 
 **Examples**:
 
-- `IA_x` (increasing whole life)
-- `gaa_x_n` (geometric increasing term annuity)
-- `t_aa_x` (deferred annuity)
-- `A_x_` (whole life with selection)
+- `IAx` (increasing whole life)
+- `gaaxn` (geometric increasing term annuity)
+- `Ax1n` (term life insurance)
+- `nEx` (pure endowment)
 
 ### Selection Functions
 
