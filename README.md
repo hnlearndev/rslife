@@ -44,7 +44,7 @@ fn main() -> PolarsResult<()> {
     // Calculate actuarial values
     let whole_life = A_x(&config, 35)?;
     let annuity = aa_x_n(&config, 35, 1)?;
-    let survival = t_p_x(&config, 5.0, 30.0)?;
+    let survival = tpx(&config, 5.0, 30.0)?;
 
     println!("Whole life: {:.6}", whole_life);
     println!("Annuity: {:.6}", annuity);
@@ -71,7 +71,7 @@ fn main() -> PolarsResult<()> {
     let xml = MortXML::from_df(df)?;
     let config = MortTableConfig {
         xml,
-        radix: Some(10_000),
+        radix: Some(100_000),
         int_rate: Some(0.05),
         pct: Some(0.01),
         assumption: AssumptionEnum::UDD
