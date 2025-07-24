@@ -25,7 +25,7 @@
 //!
 //! // Create custom mortality data
 //! let df = df! {
-//!     "age" => [25, 26],
+//!     "age" => [25u32, 26u32],
 //!     "qx" => [0.0015, 0.0018],
 //! }?;
 //!
@@ -432,7 +432,7 @@ impl MortXML {
     /// Parse mortality table from XLSX file using calamine.
     ///
     /// Reads XLSX files and automatically parses columns based on their names:
-    /// - "age" and "duration" columns are parsed as i32
+    /// - "age" and "duration" columns are parsed as u32
     /// - All other columns ("qx", "lx", etc.) are parsed as f64
     ///
     /// Schema validation is performed by `from_df()` after parsing.
@@ -498,9 +498,9 @@ impl MortXML {
 
             for (col_idx, (cell, col_name)) in row.iter().zip(column_names.iter()).enumerate() {
                 let any_value = if col_name == "age" || col_name == "duration" {
-                    // Parse as i32
-                    let val = Self::_parse_xlsx_i32_cell(Some(cell), row_num, col_name)?;
-                    AnyValue::Int32(val)
+                    // Parse as u32
+                    let val = Self::_parse_xlsx_u32_cell(Some(cell), row_num, col_name)?;
+                    AnyValue::UInt32(val)
                 } else {
                     // Parse as f64 for all other columns (qx, lx, etc.)
                     let val = Self::_parse_xlsx_f64_cell(Some(cell), row_num, col_name)?;
@@ -532,7 +532,7 @@ impl MortXML {
     /// Parse mortality table from ODS file using spreadsheet-ods.
     ///
     /// Reads ODS files and automatically parses columns based on their names:
-    /// - "age" and "duration" columns are parsed as i32
+    /// - "age" and "duration" columns are parsed as u32
     /// - All other columns ("qx", "lx", etc.) are parsed as f64
     ///
     /// Schema validation is performed by `from_df()` after parsing.
@@ -599,9 +599,9 @@ impl MortXML {
             for (col_idx, col_name) in column_names.iter().enumerate() {
                 let cell_value = sheet.value(row, col_idx as u32);
                 let any_value = if col_name == "age" || col_name == "duration" {
-                    // Parse as i32
-                    let val = Self::_parse_ods_i32_cell(cell_value, row_num, col_name)?;
-                    AnyValue::Int32(val)
+                    // Parse as u32
+                    let val = Self::_parse_ods_u32_cell(cell_value, row_num, col_name)?;
+                    AnyValue::UInt32(val)
                 } else {
                     // Parse as f64 for all other columns (qx, lx, etc.)
                     let val = Self::_parse_ods_f64_cell(cell_value, row_num, col_name)?;
@@ -720,16 +720,10 @@ impl MortXML {
         }
 
         // Additional data validation
-        // Check for negative ages
-        let age_column = df.column("age")?;
-        let age_series = age_column.as_materialized_series();
-        if let Ok(Some(min_age)) = age_series.min::<i32>() {
-            if min_age < 0 {
-                return Err(
-                    format!("Age values must be non-negative, found minimum: {min_age}").into(),
-                );
-            }
-        }
+        // Check for negative ages - not needed for u32 since u32 is always non-negative
+        // The type system ensures this, but we can still check for reasonable ranges
+        let _age_column = df.column("age")?;
+        // u32 is always non-negative, so no need to check for negative values
 
         // Check for valid mortality/life values (should be non-negative for most cases)
         let value_column = df.column(value_col_name)?;
@@ -764,18 +758,11 @@ impl MortXML {
             }
         }
 
-        // Check duration values if present
+        // Check duration values if present - not needed for u32 since u32 is always non-negative
+        // The type system ensures this for u32 duration columns
         if num_cols == 3 {
-            let duration_column = df.column("duration")?;
-            let duration_series = duration_column.as_materialized_series();
-            if let Ok(Some(min_dur)) = duration_series.min::<i32>() {
-                if min_dur < 0 {
-                    return Err(format!(
-                        "Duration values must be non-negative, found minimum: {min_dur}"
-                    )
-                    .into());
-                }
-            }
+            // Duration column exists and is validated to be u32 type above
+            // u32 is always non-negative, so no additional validation needed
         }
 
         Ok(())
@@ -793,25 +780,25 @@ impl MortXML {
         }
     }
 
-    /// Parse ODS cell value as i32 with comprehensive error handling.
-    fn _parse_ods_i32_cell(
+    /// Parse ODS cell value as u32 with comprehensive error handling.
+    fn _parse_ods_u32_cell(
         cell_value: &Value,
         row_num: usize,
         col_name: &str,
-    ) -> Result<i32, Box<dyn std::error::Error>> {
+    ) -> Result<u32, Box<dyn std::error::Error>> {
         match cell_value {
             Value::Number(f) => {
-                if f.is_nan() || f.is_infinite() || *f < 0.0 || *f > i32::MAX as f64 {
+                if f.is_nan() || f.is_infinite() || *f < 0.0 || *f > u32::MAX as f64 {
                     Err(
                         format!("{col_name} value {f} at row {row_num} is invalid or out of range")
                             .into(),
                     )
                 } else {
-                    Ok(*f as i32)
+                    Ok(*f as u32)
                 }
             }
-            Value::Text(s) => s.parse::<i32>().map_err(|_| {
-                format!("Cannot parse {col_name} '{s}' at row {row_num} as integer").into()
+            Value::Text(s) => s.parse::<u32>().map_err(|_| {
+                format!("Cannot parse {col_name} '{s}' at row {row_num} as unsigned integer").into()
             }),
             // Bool type not supported in this version of spreadsheet-ods
             Value::Empty => Err(format!("Missing {col_name} value at row {row_num}").into()),
@@ -856,35 +843,35 @@ impl MortXML {
         }
     }
 
-    /// Parse cell value as i32 with comprehensive error handling.
-    fn _parse_xlsx_i32_cell(
+    /// Parse cell value as u32 with comprehensive error handling.
+    fn _parse_xlsx_u32_cell(
         cell: Option<&Data>,
         row_num: usize,
         col_name: &str,
-    ) -> Result<i32, Box<dyn std::error::Error>> {
+    ) -> Result<u32, Box<dyn std::error::Error>> {
         match cell {
             Some(Data::Int(v)) => {
-                if *v < 0 || *v > i32::MAX as i64 {
+                if *v < 0 || *v > u32::MAX as i64 {
                     Err(
                         format!("{col_name} value {v} at row {row_num} is out of valid range")
                             .into(),
                     )
                 } else {
-                    Ok(*v as i32)
+                    Ok(*v as u32)
                 }
             }
             Some(Data::Float(f)) => {
-                if f.is_nan() || f.is_infinite() || *f < 0.0 || *f > i32::MAX as f64 {
+                if f.is_nan() || f.is_infinite() || *f < 0.0 || *f > u32::MAX as f64 {
                     Err(
                         format!("{col_name} value {f} at row {row_num} is invalid or out of range")
                             .into(),
                     )
                 } else {
-                    Ok(*f as i32)
+                    Ok(*f as u32)
                 }
             }
-            Some(Data::String(s)) => s.parse::<i32>().map_err(|_| {
-                format!("Cannot parse {col_name} '{s}' at row {row_num} as integer").into()
+            Some(Data::String(s)) => s.parse::<u32>().map_err(|_| {
+                format!("Cannot parse {col_name} '{s}' at row {row_num} as unsigned integer").into()
             }),
             Some(Data::Bool(b)) => Ok(if *b { 1 } else { 0 }),
             Some(Data::Empty) => Err(format!("Missing {col_name} value at row {row_num}").into()),
@@ -1394,7 +1381,7 @@ mod tests {
                 let qx_col = df.column("qx").unwrap();
 
                 // First age should be 0
-                assert_eq!(age_col.get(0).unwrap().try_extract::<i32>().unwrap(), 0);
+                assert_eq!(age_col.get(0).unwrap().try_extract::<u32>().unwrap(), 0);
 
                 // First qx should be around 0.00632 (from examine output)
                 let first_qx = qx_col.get(0).unwrap().try_extract::<f64>().unwrap();
@@ -1405,7 +1392,7 @@ mod tests {
 
                 println!(
                     "  First age: {}",
-                    age_col.get(0).unwrap().try_extract::<i32>().unwrap()
+                    age_col.get(0).unwrap().try_extract::<u32>().unwrap()
                 );
                 println!("  First qx: {:.5}", first_qx);
             }
@@ -1420,7 +1407,7 @@ mod tests {
         use polars::prelude::*;
 
         // Create synthetic mortality table data
-        let ages = (0..121).collect::<Vec<i32>>();
+        let ages = (0..121).map(|x| x as u32).collect::<Vec<u32>>();
         let values = (0..121)
             .map(|age| {
                 // Simple mortality model: q_x = 0.001 * e^(age/80)
@@ -1483,7 +1470,7 @@ mod tests {
         let first_age = age_column.get(0).unwrap();
         let first_value = value_column.get(0).unwrap();
 
-        assert_eq!(first_age.try_extract::<i32>().unwrap(), 0);
+        assert_eq!(first_age.try_extract::<u32>().unwrap(), 0);
         // First value should be 0.001 * e^(0/80) = 0.001 * 1 = 0.001
         assert!((first_value.try_extract::<f64>().unwrap() - 0.001).abs() < 1e-10);
 
@@ -1491,7 +1478,7 @@ mod tests {
         let last_age = age_column.get(120).unwrap();
         let last_value = value_column.get(120).unwrap();
 
-        assert_eq!(last_age.try_extract::<i32>().unwrap(), 120);
+        assert_eq!(last_age.try_extract::<u32>().unwrap(), 120);
         // Last value should be 0.001 * e^(120/80) = 0.001 * e^1.5 ≈ 0.004481
         let expected_last_value = 0.001 * (120.0_f64 / 80.0).exp();
         assert!((last_value.try_extract::<f64>().unwrap() - expected_last_value).abs() < 1e-6);
@@ -1515,7 +1502,7 @@ mod tests {
 
         // Test valid DataFrame with qx column
         let df = df! {
-            "age" => [25i32, 26i32, 27i32],
+            "age" => [25u32, 26u32, 27u32],
             "qx" => [0.0015f64, 0.0018f64, 0.0020f64],
         }
         .expect("Failed to create DataFrame");
@@ -1530,7 +1517,7 @@ mod tests {
 
         // Test valid DataFrame with lx column
         let df = df! {
-            "age" => [25i32, 26i32, 27i32],
+            "age" => [25u32, 26u32, 27u32],
             "lx" => [100000.0f64, 99850.0f64, 99680.0f64],
         }
         .expect("Failed to create DataFrame");
@@ -1545,9 +1532,9 @@ mod tests {
 
         // Test valid DataFrame with duration column
         let df = df! {
-            "age" => [25i32, 26i32, 27i32],
+            "age" => [25u32, 26u32, 27u32],
             "qx" => [0.0015f64, 0.0018f64, 0.0020f64],
-            "duration" => [0i32, 1i32, 2i32],
+            "duration" => [0u32, 1u32, 2u32],
         }
         .expect("Failed to create DataFrame");
 
@@ -1564,7 +1551,7 @@ mod tests {
 
         // Test DataFrame with wrong column name
         let df = df! {
-            "age" => [25i32, 26i32, 27i32],
+            "age" => [25u32, 26u32, 27u32],
             "value" => [0.0015f64, 0.0018f64, 0.0020f64],  // Wrong column name
         }
         .expect("Failed to create DataFrame");
@@ -1584,7 +1571,7 @@ mod tests {
 
         // Test DataFrame with wrong age column name
         let df = df! {
-            "years" => [25i32, 26i32, 27i32],  // Wrong column name
+            "years" => [25u32, 26u32, 27u32],  // Wrong column name
             "qx" => [0.0015f64, 0.0018f64, 0.0020f64],
         }
         .expect("Failed to create DataFrame");
@@ -1604,7 +1591,7 @@ mod tests {
 
         // Test DataFrame with wrong data types
         let df = df! {
-            "age" => [25.0f64, 26.0f64, 27.0f64],  // Should be i32
+            "age" => [25.0f64, 26.0f64, 27.0f64],  // Should be u32
             "qx" => [0.0015f64, 0.0018f64, 0.0020f64],
         }
         .expect("Failed to create DataFrame");
@@ -1615,7 +1602,7 @@ mod tests {
             "DataFrame with wrong age data type should fail validation"
         );
         let error_msg = result.unwrap_err().to_string();
-        assert!(error_msg.contains("First column 'age' must be i32 type"));
+        assert!(error_msg.contains("First column 'age' must be u32 type"));
     }
 
     #[test]
@@ -1624,7 +1611,7 @@ mod tests {
 
         // Test empty DataFrame
         let df = df! {
-            "age" => Vec::<i32>::new(),
+            "age" => Vec::<u32>::new(),
             "qx" => Vec::<f64>::new(),
         }
         .expect("Failed to create DataFrame");
@@ -1639,20 +1626,21 @@ mod tests {
     fn test_dataframe_schema_validation_negative_ages() {
         use polars::prelude::*;
 
-        // Test DataFrame with negative ages
+        // Test DataFrame with negative ages - now impossible with u32
+        // This test is no longer valid since u32 cannot represent negative values
+        // We'll test a different validation scenario instead
         let df = df! {
-            "age" => [-1i32, 26i32, 27i32],  // Negative age
+            "age" => [25u32, 26u32, 27u32],
             "qx" => [0.0015f64, 0.0018f64, 0.0020f64],
         }
         .expect("Failed to create DataFrame");
 
         let result = MortXML::from_df(df);
+        // With u32, negative ages are impossible, so this test now passes
         assert!(
-            result.is_err(),
-            "DataFrame with negative ages should fail validation"
+            result.is_ok(),
+            "Valid u32 DataFrame should pass validation"
         );
-        let error_msg = result.unwrap_err().to_string();
-        assert!(error_msg.contains("Age values must be non-negative"));
     }
 
     #[test]
@@ -1661,7 +1649,7 @@ mod tests {
 
         // Test DataFrame with qx values > 1.0
         let df = df! {
-            "age" => [25i32, 26i32, 27i32],
+            "age" => [25u32, 26u32, 27u32],
             "qx" => [0.5f64, 1.5f64, 0.8f64],  // 1.5 > 1.0
         }
         .expect("Failed to create DataFrame");
@@ -1681,9 +1669,9 @@ mod tests {
 
         // Test DataFrame with too many columns
         let df = df! {
-            "age" => [25i32, 26i32, 27i32],
+            "age" => [25u32, 26u32, 27u32],
             "qx" => [0.0015f64, 0.0018f64, 0.0020f64],
-            "duration" => [0i32, 1i32, 2i32],
+            "duration" => [0u32, 1u32, 2u32],
             "extra" => [1.0f64, 2.0f64, 3.0f64],  // Too many columns
         }
         .expect("Failed to create DataFrame");

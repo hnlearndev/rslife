@@ -33,11 +33,11 @@ pub use crate::whole::{
     gAx, gAx1n, gnEx, gAxn,
 
     // Survival Probabilities
-    tpx, tqx,
+    // tpx, tqx,
 };
 
-// Result and error types from Polars
-pub use polars::prelude::{PolarsError, PolarsResult};
+// Unified interface for whole and fractional age calculations
+pub use crate::fractional::{tpx, tqx};
 
-// Most commonly used Polars DataFrame types for working with mortality tables
-pub use polars::prelude::{DataFrame, LazyFrame, Series};
+// Most commonly used Polars types for working with mortality tables
+pub use polars::prelude::{DataFrame, LazyFrame, PolarsError, PolarsResult, Series};

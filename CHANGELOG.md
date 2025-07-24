@@ -1,6 +1,6 @@
 # CHANGE LOG FOR RSLIFE PACKAGE
 
-## [0.1.3] - 2025-07-24
+## [0.1.3] - 2025-07-25
 
 ### Changed in v0.1.3
 

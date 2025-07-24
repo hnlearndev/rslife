@@ -4,7 +4,7 @@ use super::*;
 /// Calculate ₜpₓ: probability of surviving t years from age x (fractional ages supported).
 ///
 /// Uses UDD, CFM, or HPB formulas for fractional ages/times; delegates to whole ages if both are integers.
-pub fn tpx(config: &MortTableConfig, t: f64, x: f64, entry_age: Option<u32>) -> PolarsResult<f64> {
+pub fn tpx(config: &MortTableConfig, x: f64, t: f64, entry_age: Option<u32>) -> PolarsResult<f64> {
     if !is_table_layout_approved(config) {
         return Err(PolarsError::ComputeError(
             "Mortality table XML layout is not suitable for calculations".into(),
@@ -58,8 +58,8 @@ pub fn tpx(config: &MortTableConfig, t: f64, x: f64, entry_age: Option<u32>) -> 
 /// Calculate ₜqₓ - probability of dying within t years starting at age x (fractional ages supported).
 ///
 /// This is the complement of [`tpx`]: ₜqₓ = 1 - ₜpₓ.
-pub fn tqx(config: &MortTableConfig, t: f64, x: f64, entry_age: Option<u32>) -> PolarsResult<f64> {
-    let result = 1.0 - tpx(config, t, x, entry_age)?;
+pub fn tqx(config: &MortTableConfig, x: f64, t: f64, entry_age: Option<u32>) -> PolarsResult<f64> {
+    let result = 1.0 - tpx(config, x, t, entry_age)?;
     Ok(result)
 }
 

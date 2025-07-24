@@ -43,7 +43,7 @@ fn main() -> PolarsResult<()> {
     };
 
     // Calculate actuarial values
-    let whole_life = Ax(&config, 35, 0, None)?;
+    let whole_life = Ax(&config, 35, 0  None)?;
     let annuity = aaxn(&config, 35, 1, 1, 0, None)?;
     let survival = tpx(&config, 5.0, 30.0, None)?;
 
@@ -75,12 +75,26 @@ fn main() -> PolarsResult<()> {
         radix: Some(100_000),
         int_rate: Some(0.05),
         pct: Some(0.01),
-        assumption: AssumptionEnum::UDD
+        assumption: Some(AssumptionEnum::UDD)
     };
 
-    let insurance_value = Ax(&config, 30, 0, None)?;
+    let whole_life_benefit = Ax(&config, 30, 0, None)?;
 
-    println!("Custom table insurance value: {:.6}", insurance_value);
+    println!("Custom table insurance value: {:.6}", whole_life_benefit);
+
+    // Load from Excel file
+    let xml = MortXML::from_df(df)?;
+    let config = MortTableConfig {
+        xml,
+        radix: Some(100_000),
+        int_rate: Some(0.05),
+        pct: Some(0.01),
+        assumption: Some(AssumptionEnum::UDD)
+    };
+
+    let 5_year_deferred_increasing_endowment_benefit = IAxn(&config, 20, 10, 5, 0, None)?;
+
+    println!("Custom table insurance value: {:.6}", 5_year_deferred_increasing_endowment_benefit);
 
     Ok(())
 }
@@ -98,10 +112,10 @@ fn main() -> PolarsResult<()> {
 
 RSLife automatically optimizes performance with a 4-level detail system:
 
-- **Level 1** (~3x faster): Demographics only (`age`, `qx`, `px`, `lx`, `dx`) - for life table analysis
-- **Level 2** (standard): Level 1 + basic commutation (`Cx`, `Dx`) - for most actuarial calculations
-- **Level 3** (extended): Level 2 + additional commutation (`Mx`, `Nx`, `Px`) - for some calculations
-- **Level 4** (complete): Same as Level 3 + additional `Rx`, `Sx` - reserved for future specialized functions
+- **Level 1** (~3x faster): Demographics only `age`, `qx`, `px`, `lx`, `dx`
+- **Level 2** (standard): Level 1 + basic commutation `Cx`, `Dx`
+- **Level 3** (extended): Level 2 + additional commutation `Mx`, `Nx`, `Px`
+- **Level 4** (complete): Level 3 + additional `Rx`, `Sx`
 
 Functions automatically select the minimum required level for optimal performance.
 
@@ -135,68 +149,41 @@ Hyperbolic interpolation:
 
 ## Actuarial Functions & Naming Convention
 
-The library provides 88+ actuarial functions following systematic naming patterns based on standard actuarial notation:
-
-
 ### Function Structure
-
-**Base Patterns**:
-
-- `Ax` (insurance)
-- `aaxn` (annuities)
-- `tpx` (survival)
 
 **Systematic Modifiers**:
 
+- **Imediate**: Single letter → `Ax`, `Axn` (payments at end)
 - **Due**: Double letter → `aax`, `aaxn` (payments at start)
 - **Increasing**: `I` prefix → `IAx`, `Iaax` (arithmetic growth)
 - **Decreasing**: `D` prefix → `DAx1n`, `Daaxn` (arithmetic decrease)
 - **Geometric**: `g` prefix → `gAx`, `gaax` (geometric growth)
-- **Deferred**: `t_` prefix → deferred versions available
-- **Selection**: `_` suffix → selection variants available
 
-**Examples**:
+These modifiers are applicable to most but not all functions.
 
-- `IAx` (increasing whole life)
-- `gaaxn` (geometric increasing term annuity)
-- `Ax1n` (term life insurance)
-- `nEx` (pure endowment)
+Please take a look at [Full list](https//:google.com)
 
-### Selection Functions
+### Full list of actuarial functions available via `rslife::prelude::*`
 
-All actuarial functions (insurance, annuities, and survival) have corresponding selection variants with a `_` suffix:
+**Annuities:**
 
-- **Insurance**:
-  - `A_x_(config, entry_age, x)`,
-  - `AA_x_(config, entry_age, x)`,
-  - `IA_x_(config, entry_age, x)`,
-  - etc.
-- **Annuities**:
-  - `aa_x_n_(config, entry_age, x, n)`,
-  - `Iaa_x_(config, entry_age, x)`,
-  - `gaa_x_n_(config, entry_age, x, n)`,
-  - etc.
-- **Survival**:
-  - `tpx_(config, entry_age, t, x)`,
-  - `tqx_(config, entry_age, t, x)`
-  - etc.
+- `aax`, `aaxn`
+- `Iaax`, `Iaaxn`
+- `Daaxn`
+- `gaax`, `gaaxn`
 
-#### Key Differences
+**Benefits and Life Insurance:**
 
-- **Additional Parameter**: Selection functions require an `entry_age` parameter in addition to the standard parameters
-- **Signature**: `function_(config, entry_age, ...other_params)` vs `function(config, ...params)`
-- **Purpose**: Handle select mortality tables where mortality rates depend on both current age and time since policy issue
+- `Ax`, `Ax1n`, `nEx`, `Axn`
+- `IAx`, `IAx1n`, `IAxn`
+- `DAx1n`, `DAxn`
+- `gAx`, `gAx1n`, `gnEx`, `gAxn`
 
-#### Design Rationale
+**Survival Probabilities:**
 
-Selection functions use a separate namespace (with `_` suffix) rather than being integrated into the main functions because:
+- `tpx`, `tqx`
 
-1. **Rare Usage**: Select mortality tables are encountered infrequently in practice
-2. **Explicit Intent**: When selection effects are relevant, it's better to make this explicit through distinct function names
-3. **Parameter Clarity**: The additional `entry_age` parameter makes the selection context immediately apparent
-4. **API Simplicity**: Keeps the main function signatures clean for the common non-select case
-
-This design choice prioritizes clarity and intentionality over API unification, ensuring that when selection effects matter, developers are explicitly aware of using specialized functionality.
+For more details, please visit the [full documentation](google.com)
 
 ## Examples
 
@@ -205,12 +192,6 @@ Check out the `examples/` directory for more comprehensive examples:
 - `prelude_demo.rs` - Basic usage with the prelude
 - `mortality_calculations.rs` - Detailed actuarial calculations
 - `xml_loading.rs` - Various ways to load mortality data
-
-## Mathematical Documentation
-
-All functions include comprehensive mathematical documentation with Unicode formulas. View the full documentation at [docs.rs/rslife](https://docs.rs/rslife).
-
-**Math Rendering**: The notation in this README and documentation uses Unicode characters for optimal rendering on both GitHub and crates.io, ensuring mathematical formulas display correctly across all platforms without requiring LaTeX rendering support.
 
 ## Contributing
 
@@ -222,9 +203,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Contact
 
-**Trung-Hieu Nguyen** - [hieunt.hello@gmail.com](mailto:hieunt.hello@gmail.com)
+**Willian Nguyen** - [hieunt.hello@gmail.com](mailto:hieunt.hello@gmail.com)
 
-Project Link: [https://github.com/hnlearndev/rslife](https://github.com/hnlearndev//rslife)
+Project Link: [https://github.com/hnlearndev/rslife](https://github.com/hnlearndev/rslife)
 
 ## References
 

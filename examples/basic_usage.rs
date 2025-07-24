@@ -52,8 +52,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!();
 
     // Survival probability calculations
-    let survival_10_years = tpx(&config, 10, 30, None)?;
-    let mortality_10_years = tqx(&config, 10, 30, None)?;
+    let survival_10_years = tpx(&config, 30.0, 10.0, None)?;
+    let mortality_10_years = tqx(&config, 30.0, 10.0, None)?;
 
     println!("Survival calculations (10 years, age 30):");
     println!("  Survival probability (tpx): {survival_10_years:.6}");

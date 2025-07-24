@@ -295,9 +295,9 @@ fn _gen_demographic_movement_life_table_content(
     let pct = config.pct.unwrap_or(1.0);
 
     // Obtain age and lx columns
-    let age: Vec<i32> = df
+    let age: Vec<u32> = df
         .column("age")?
-        .i32()?
+        .u32()?
         .into_iter()
         .map(|v| v.unwrap())
         .collect();
@@ -346,9 +346,9 @@ fn _gen_demographic_movement_other_content(config: MortTableConfig) -> PolarsRes
     let radix = config.radix;
 
     // Obtain age and qx columns
-    let age: Vec<i32> = df
+    let age: Vec<u32> = df
         .column("age")?
-        .i32()?
+        .u32()?
         .into_iter()
         .map(|v| v.unwrap())
         .collect();
@@ -407,10 +407,10 @@ fn gen_commutation_level_2(
     // Obtain age, lx, and dx columns
     let age = df
         .column("age")?
-        .i32()?
+        .u32()?
         .into_iter()
         .map(|v| v.unwrap())
-        .collect::<Vec<i32>>();
+        .collect::<Vec<u32>>();
 
     let lx = df
         .column("lx")?

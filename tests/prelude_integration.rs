@@ -109,8 +109,8 @@ fn test_prelude_annuity_functions() {
 #[test]
 fn test_prelude_fractional_age_functions() {
     // Test fractional age function signatures
-    let _tpx_fn = tpx as fn(&MortTableConfig, u32, u32, Option<u32>) -> PolarsResult<f64>;
-    let _tqx_fn = tqx as fn(&MortTableConfig, u32, u32, Option<u32>) -> PolarsResult<f64>;
+    let _tpx_fn = tpx as fn(&MortTableConfig, f64, f64, Option<u32>) -> PolarsResult<f64>;
+    let _tqx_fn = tqx as fn(&MortTableConfig, f64, f64, Option<u32>) -> PolarsResult<f64>;
 
     println!("✓ Fractional age functions (tpx, tqx) accessible through prelude");
 }
@@ -140,8 +140,8 @@ fn test_prelude_comprehensive_functionality() {
     ];
 
     let _fractional_functions = [
-        std::any::type_name_of_val(&(tpx as fn(&MortTableConfig, u32, u32, Option<u32>) -> PolarsResult<f64>)),
-        std::any::type_name_of_val(&(tqx as fn(&MortTableConfig, u32, u32, Option<u32>) -> PolarsResult<f64>)),
+        std::any::type_name_of_val(&(tpx as fn(&MortTableConfig, f64, f64, Option<u32>) -> PolarsResult<f64>)),
+        std::any::type_name_of_val(&(tqx as fn(&MortTableConfig, f64, f64, Option<u32>) -> PolarsResult<f64>)),
     ];
 
     println!("✓ All function categories successfully imported");
@@ -173,7 +173,7 @@ fn test_prelude_with_real_data() {
     // Test function type signatures
     let _test_ax = Ax as fn(&MortTableConfig, u32, u32, Option<u32>) -> PolarsResult<f64>;
     let _test_aaxn = aaxn as fn(&MortTableConfig, u32, u32, u32, u32, Option<u32>) -> PolarsResult<f64>;
-    let _test_tpx = tpx as fn(&MortTableConfig, u32, u32, Option<u32>) -> PolarsResult<f64>;
+    let _test_tpx = tpx as fn(&MortTableConfig, f64, f64, Option<u32>) -> PolarsResult<f64>;
 
     println!("✓ XML loading works through prelude");
     println!("✓ Function exports are accessible");
