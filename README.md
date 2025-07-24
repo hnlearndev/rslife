@@ -158,8 +158,8 @@ The library provides 88+ actuarial functions following systematic naming pattern
 **Examples**:
 
 - `IA_x` (increasing whole life)
+- `gaa_x_n` (geometric increasing term annuity)
 - `t_aa_x` (deferred annuity)
-- `gIaa_x_n` (geometric increasing term annuity)
 - `A_x_` (whole life with selection)
 
 ### Selection Functions
