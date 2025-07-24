@@ -2,8 +2,6 @@
 
 A comprehensive Rust library for actuarial mortality table calculations and life insurance mathematics, following standard actuarial principles and notation.
 
-**Built on Polars** - Leveraging high-performance DataFrame technology for fast actuarial computations with memory efficiency and parallel processing capabilities.
-
 [![Crates.io](https://img.shields.io/crates/v/rslife.svg)](https://crates.io/crates/rslife)
 [![Documentation](https://docs.rs/rslife/badge.svg)](https://docs.rs/rslife)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -36,7 +34,11 @@ fn main() -> PolarsResult<()> {
     // Load SOA mortality table
     let xml = MortXML::from_url_id(1704)?;
     let config = MortTableConfig {
-        xml, radix: Some(100_000), int_rate: Some(0.03), ..Default::default()
+        xml,
+        radix: Some(100_000),
+        int_rate: Some(0.03),
+        pct: Some(0.01),
+        assumption: AssumptionEnum::UDD
     };
 
     // Calculate actuarial values
@@ -44,8 +46,9 @@ fn main() -> PolarsResult<()> {
     let annuity = aaxn(&config, 35, 1)?;
     let survival = tpx(&config, 5.0, 30.0)?;
 
-    println!("Whole life: {:.6}, Annuity: {:.6}, 5yr survival: {:.6}",
-             whole_life, annuity, survival);
+    println!("Whole life: {:.6}", whole_life);
+    println!("Annuity: {:.6}", annuity);
+    println!("5yr survival: {:.6}", survival);
     Ok(())
 }
 ```
@@ -218,8 +221,9 @@ Project Link: [https://github.com/hnlearndev/rslife](https://github.com/hnlearnd
 
 ## References
 
-- [Actuarial Mathematics (Bowers et al.)](https://www.soa.org/shop/actuarial-mathematics)
-- [Society of Actuaries Mortality Tables](https://mort.soa.org/Default.aspx)
+- [Actuarial Mathematics for Life Contingent Risks](https://www.goodreads.com/book/show/58306503-actuarial-mathematics-for-life-contingent-risks)
+- [Actuarial Mathematics](https://www.goodreads.com/book/show/1715653.Actuarial_Mathematics)
+- [Society of Actuaries Mortality Tables](https://mort.soa.org)
 - Standard actuarial notation and practices
 
 ### Similar Projects

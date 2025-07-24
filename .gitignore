@@ -35,10 +35,12 @@ node_modules/
 # Personal reference files
 README_FORMULAS.md
 
-# Folder diagrams
-diagrams/*.drawio
-diagrams/*.svg
-diagrams/*.bkp
+# Folder diagrams - ignore everything except .gif files
+diagrams/*
+!diagrams/*.gif
 
-# Folder examples
-examples/*.pdf
+# Folder examples - ignore everything except .ods, .xlsx, and .rs files
+examples/*
+!examples/*.ods
+!examples/*.xlsx
+!examples/*.rs
