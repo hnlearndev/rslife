@@ -22,7 +22,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rslife = "0.1.1"
+rslife = "0.1.2"
 ```
 
 ### Basic Example
