@@ -94,7 +94,7 @@
 //!
 //! ### Life Insurance Benefits
 //! - `Ax(config, x, t, entry_age)` - Whole life insurance (immediate or deferred by t years)
-//! - `Ax1n(config, x, n, t, entry_age)` - Term life insurance (n-year term, deferred by t years)  
+//! - `Ax1n(config, x, n, t, entry_age)` - Term life insurance (n-year term, deferred by t years)
 //! - `nEx(config, x, n, t, entry_age)` - Pure endowment (deferred by t years)
 //! - `Axn(config, x, n, t, entry_age)` - Endowment insurance (n-year endowment, deferred by t years)
 //!
@@ -103,14 +103,14 @@
 //! - `IAx1n(config, x, n, t, entry_age)` - Increasing term life (n-year term, deferred by t years)
 //! - `IAxn(config, x, n, t, entry_age)` - Increasing endowment insurance
 //!
-//! ### Decreasing Benefit Insurance  
+//! ### Decreasing Benefit Insurance
 //! - `DAx1n(config, x, n, t, entry_age)` - Decreasing term life (n-year term, deferred by t years)
 //! - `DAxn(config, x, n, t, entry_age)` - Decreasing endowment insurance
 //!
 //! ### Geometric Increasing Benefits
 //! - `gAx(config, x, g, t, entry_age)` - Geometric whole life (growth rate g, deferred by t years)
 //! - `gAx1n(config, x, n, g, t, entry_age)` - Geometric term life
-//! - `gnEx(config, x, n, g, t, entry_age)` - Geometric pure endowment  
+//! - `gnEx(config, x, n, g, t, entry_age)` - Geometric pure endowment
 //! - `gAxn(config, x, n, g, t, entry_age)` - Geometric endowment insurance
 //!
 //! ### Annuities
@@ -124,7 +124,7 @@
 //! ### Decreasing Annuities
 //! - `Daaxn(config, x, n, m, t, entry_age)` - Decreasing temporary annuity-due
 //!
-//! ### Geometric Increasing Annuities  
+//! ### Geometric Increasing Annuities
 //! - `gaax(config, x, m, g, t, entry_age)` - Geometric life annuity-due (growth rate g)
 //! - `gaaxn(config, x, n, m, g, t, entry_age)` - Geometric temporary annuity-due
 //!
@@ -140,6 +140,7 @@
 
 pub mod fractional;
 pub mod helpers;
+pub mod int_rate_convert;
 pub mod mt_config;
 pub mod prelude;
 pub mod whole;

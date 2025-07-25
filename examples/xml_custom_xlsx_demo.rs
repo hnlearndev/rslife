@@ -1,7 +1,7 @@
 // Example demonstrating loading mortality tables from real XLSX files
 // This demo uses actual mortality data files: elt15.xlsx, am92_select.xlsx, and ltam_standard_ultimate.xlsx
-use rslife::prelude::*;
 use polars::df;
+use rslife::prelude::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🦀 RSLife Custom XLSX Demo with Real Data");
@@ -98,7 +98,7 @@ fn demo_elt15_female() -> Result<(), Box<dyn std::error::Error>> {
             println!("⚠️  Could not load ELT15 file: {}", e);
             println!("   This is likely a data type validation issue in the XLSX parser.");
             println!("   📋 Let's demonstrate the expected format and show a workaround:");
-            
+
             // Workaround: create sample data manually to show what should work
             demonstrate_elt15_format()?;
         }
@@ -109,7 +109,7 @@ fn demo_elt15_female() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Demonstrate loading and using AM92 select mortality data
 fn demo_am92_select() -> Result<(), Box<dyn std::error::Error>> {
-    let xlsx_result = MortXML::from_xlsx("data/am92_select.xlsx", "AM92");
+    let xlsx_result = MortXML::from_xlsx("data/am92.xlsx", "am92");
 
     match xlsx_result {
         Ok(xml) => {
@@ -137,7 +137,9 @@ fn demo_am92_select() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             // Perform calculations if it's a proper mortality table
-            if columns.iter().any(|col| col.as_str() == "qx") || columns.iter().any(|col| col.as_str() == "lx") {
+            if columns.iter().any(|col| col.as_str() == "qx")
+                || columns.iter().any(|col| col.as_str() == "lx")
+            {
                 let config = MortTableConfig {
                     xml,
                     radix: Some(100_000),
@@ -187,7 +189,9 @@ fn demo_ltam_ultimate() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             // Perform comprehensive calculations
-            if columns.iter().any(|col| col.as_str() == "qx") || columns.iter().any(|col| col.as_str() == "lx") {
+            if columns.iter().any(|col| col.as_str() == "qx")
+                || columns.iter().any(|col| col.as_str() == "lx")
+            {
                 let config = MortTableConfig {
                     xml,
                     radix: Some(100_000),
@@ -251,34 +255,37 @@ fn demo_ltam_ultimate() -> Result<(), Box<dyn std::error::Error>> {
 /// Demonstrate ELT15 format with sample data when XLSX loading fails
 fn demonstrate_elt15_format() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n💡 Creating sample ELT15-style data to demonstrate functionality:");
-    
+
     // Create sample female mortality data similar to ELT15
     let ages = (0..=110).collect::<Vec<i32>>();
-    let qx_values: Vec<f64> = ages.iter().map(|&age| {
-        // Simplified female mortality pattern
-        if age < 1 {
-            0.00632 // Infant mortality
-        } else if age < 15 {
-            0.0003 + (age as f64 * 0.00001) // Low childhood mortality
-        } else if age < 25 {
-            0.0005 + (age as f64 * 0.00002) // Slightly increasing
-        } else if age < 65 {
-            0.001 + ((age as f64 - 25.0) * 0.00003) // Gradual increase
-        } else {
-            // Exponential increase after 65
-            let base = 0.01;
-            base * (1.08_f64).powf(age as f64 - 65.0).min(1.0)
-        }
-    }).collect();
-    
+    let qx_values: Vec<f64> = ages
+        .iter()
+        .map(|&age| {
+            // Simplified female mortality pattern
+            if age < 1 {
+                0.00632 // Infant mortality
+            } else if age < 15 {
+                0.0003 + (age as f64 * 0.00001) // Low childhood mortality
+            } else if age < 25 {
+                0.0005 + (age as f64 * 0.00002) // Slightly increasing
+            } else if age < 65 {
+                0.001 + ((age as f64 - 25.0) * 0.00003) // Gradual increase
+            } else {
+                // Exponential increase after 65
+                let base = 0.01;
+                base * (1.08_f64).powf(age as f64 - 65.0).min(1.0)
+            }
+        })
+        .collect();
+
     let df = df! {
         "age" => ages,
         "qx" => qx_values,
     }?;
-    
+
     println!("📈 Sample ELT15-style Female mortality data (first 10 rows):");
     println!("{}", df.head(Some(10)));
-    
+
     // Create MortXML and perform calculations
     let mort_xml = MortXML::from_df(df)?;
     let config = MortTableConfig {
@@ -288,26 +295,29 @@ fn demonstrate_elt15_format() -> Result<(), Box<dyn std::error::Error>> {
         pct: Some(0.01),
         assumption: Some(AssumptionEnum::UDD),
     };
-    
+
     println!("\n🧮 Actuarial calculations with sample ELT15-style data:");
     let whole_life_35 = Ax(&config, 35, 0, None)?;
     let survival_30p35 = tpx(&config, 30.0, 35.0, None)?;
-    
+
     println!("   Whole life insurance (age 35): {:.6}", whole_life_35);
-    println!("   30-year survival from age 35: {:.2}%", survival_30p35 * 100.0);
-    
+    println!(
+        "   30-year survival from age 35: {:.2}%",
+        survival_30p35 * 100.0
+    );
+
     Ok(())
 }
 
 /// Demonstrate AM92 format with sample data when XLSX loading fails
 fn demonstrate_am92_format() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n💡 Creating sample AM92-style select data to demonstrate functionality:");
-    
+
     // Create sample select mortality data
     let mut ages = Vec::new();
     let mut qx_values = Vec::new();
     let mut durations = Vec::new();
-    
+
     // Select period data (first 5 years after issue)
     for dur in 1..=5 {
         for age in 25..=70 {
@@ -319,74 +329,80 @@ fn demonstrate_am92_format() -> Result<(), Box<dyn std::error::Error>> {
             qx_values.push(base_qx * selection_factor);
         }
     }
-    
+
     let df = df! {
         "age" => ages,
         "qx" => qx_values,
         "duration" => durations,
     }?;
-    
+
     println!("📈 Sample AM92-style Select mortality data (first 10 rows):");
     println!("{}", df.head(Some(10)));
-    
+
     println!("   📊 This shows a SELECT table structure with duration column");
     println!("   📊 Duration 1 = first year after policy issue (lowest mortality)");
     println!("   📊 Duration 5 = fifth year after issue (approaching ultimate)");
-    
+
     Ok(())
 }
 
-/// Demonstrate LTAM format with sample data when XLSX loading fails  
+/// Demonstrate LTAM format with sample data when XLSX loading fails
 fn demonstrate_ltam_format() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n💡 Creating sample LTAM-style ultimate data to demonstrate functionality:");
-    
+
     // Create sample LTAM-style data (ages 20-100)
     let ages = (20..=100).collect::<Vec<i32>>();
-    let qx_values: Vec<f64> = ages.iter().map(|&age| {
-        // Standard ultimate mortality pattern
-        if age < 30 {
-            0.0003 + (age as f64 * 0.00001)
-        } else if age < 50 {
-            0.0008 + ((age as f64 - 30.0) * 0.00005)
-        } else if age < 70 {
-            0.002 + ((age as f64 - 50.0) * 0.0002)
-        } else {
-            // Exponential increase after 70
-            let base = 0.006;
-            base * (1.09_f64).powf(age as f64 - 70.0).min(1.0)
-        }
-    }).collect();
-    
+    let qx_values: Vec<f64> = ages
+        .iter()
+        .map(|&age| {
+            // Standard ultimate mortality pattern
+            if age < 30 {
+                0.0003 + (age as f64 * 0.00001)
+            } else if age < 50 {
+                0.0008 + ((age as f64 - 30.0) * 0.00005)
+            } else if age < 70 {
+                0.002 + ((age as f64 - 50.0) * 0.0002)
+            } else {
+                // Exponential increase after 70
+                let base = 0.006;
+                base * (1.09_f64).powf(age as f64 - 70.0).min(1.0)
+            }
+        })
+        .collect();
+
     let df = df! {
         "age" => ages,
         "qx" => qx_values,
     }?;
-    
+
     println!("📈 Sample LTAM-style Ultimate mortality data (first 8 rows):");
     println!("{}", df.head(Some(8)));
-    
+
     // Perform comprehensive calculations
     let mort_xml = MortXML::from_df(df)?;
     let config = MortTableConfig {
         xml: mort_xml,
         radix: Some(100_000),
         int_rate: Some(0.05),
-        pct: Some(0.01),  
+        pct: Some(0.01),
         assumption: Some(AssumptionEnum::UDD),
     };
-    
+
     println!("\n🧮 Comprehensive calculations with sample LTAM-style data:");
-    
+
     let whole_life_30 = Ax(&config, 30, 0, None)?;
     let whole_life_50 = Ax(&config, 50, 0, None)?;
     let annuity_30 = aax(&config, 30, 1, 0, None)?;
     let survival_40p30 = tpx(&config, 40.0, 30.0, None)?;
-    
+
     println!("   🏥 Life Insurance Values:");
     println!("     Whole life at age 30: {:.6}", whole_life_30);
     println!("     Whole life at age 50: {:.6}", whole_life_50);
     println!("   💰 Life annuity at age 30: {:.6}", annuity_30);
-    println!("   📊 40-year survival from age 30: {:.2}%", survival_40p30 * 100.0);
-    
+    println!(
+        "   📊 40-year survival from age 30: {:.2}%",
+        survival_40p30 * 100.0
+    );
+
     Ok(())
 }

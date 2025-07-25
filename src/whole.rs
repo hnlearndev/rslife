@@ -4,6 +4,7 @@
 pub mod annuities;
 pub mod benefits;
 pub mod survivals;
+pub mod benefits_2; // Testing first principles
 
 // Common imports for calculations
 use crate::helpers::{
@@ -16,3 +17,4 @@ use polars::prelude::*;
 pub use annuities::*;
 pub use benefits::*;
 pub use survivals::*;
+

@@ -82,6 +82,38 @@ use polars::prelude::*;
 /// - The requested column does not exist
 /// - Interest rate is required but not provided for levels 2-4
 pub fn get_value(config: &MortTableConfig, x: u32, column_name: &str) -> PolarsResult<f64> {
+    // Check if the table already has the requested column (for processed configurations)
+    let current_table = &config.xml.tables[0].values;
+    let has_column = current_table.get_column_names().contains(&&column_name.into());
+    
+    if has_column {
+        // Use the existing table directly
+        let df = current_table
+            .clone()
+            .lazy()
+            .filter(col("age").eq(lit(x)))
+            .select([col(column_name)])
+            .collect()?;
+            
+        // Check if the age exists in the table
+        if df.height() == 0 {
+            return Err(PolarsError::ComputeError(
+                format!("Age {x} not found in mortality table").into(),
+            ));
+        }
+
+        // Get the value
+        let column = df.column(column_name).unwrap();
+        let value = column.f64()?.get(0).ok_or_else(|| {
+            PolarsError::ComputeError(
+                format!("No value found for column '{column_name}' at age {x}").into(),
+            )
+        })?;
+        
+        return Ok(value);
+    }
+
+    // If column not found, generate the table with the required detail level
     // Determine the minimum detail level required for this column
     let detail_level = match column_name {
         // Level 1: Basic demographic functions
@@ -172,6 +204,18 @@ pub fn get_new_config_with_selected_table(
 }
 
 fn _is_table_layout_approved(config: &MortTableConfig) -> bool {
+    // === Custom data ===
+    let content_type = config.xml.content_classification.content_type.clone();
+    
+    if content_type == "Custom data with selection" {
+        return true;
+    }
+
+    if content_type == "Custom Data" {
+        return false;
+    }
+
+    // ===SOA preset format===
     // Check table layout
     let approved_table_layouts = ["Select", "Select & Ultimate"];
     let key_words = config.xml.content_classification.key_words.clone();
@@ -187,6 +231,13 @@ fn _is_table_layout_approved(config: &MortTableConfig) -> bool {
 fn _get_ultimate_mortality_table(config: &MortTableConfig) -> PolarsResult<DataFrame> {
     // If entry age is None, we will use the highest duration as ultimate rate
     let df = &config.xml.tables[0].values;
+    
+    // Check if the table has already been processed (no duration column)
+    if !df.get_column_names().contains(&&"duration".into()) {
+        // If already processed, just return the table as-is
+        return Ok(df.clone());
+    }
+    
     let max_duration = df.column("duration")?.u32()?.max().unwrap();
     let value_column_name = df.get_column_names()[1].as_str();
 

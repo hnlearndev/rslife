@@ -1,6 +1,13 @@
 use super::*;
 
 pub fn is_table_layout_approved(config: &MortTableConfig) -> bool {
+    // === Custom data ===
+    let content_type = config.xml.content_classification.content_type.clone();
+    if content_type == "Custom data" || content_type == "Custom data with selection" {
+        return true;
+    }
+
+    // === SOA preset foramt===
     // Check table layout
     let approved_table_layouts = ["Aggregate", "Ultimate"];
     let key_words = config.xml.content_classification.key_words.clone();

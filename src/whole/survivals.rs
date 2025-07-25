@@ -3,7 +3,12 @@ use super::*;
 /// Calculate ₜpₓ: probability of surviving t years from age x (whole ages only).
 ///
 /// Formula: ₜpₓ = ∏(k=0 to t-1) (1 - qₓ₊ₖ), where qₓ₊ₖ is the one-year mortality rate at age x+k.
-pub fn tpx(config: &MortTableConfig, x: u32, t: u32, entry_age: Option<u32>) -> PolarsResult<f64> {
+pub fn tpx(
+    config: &MortTableConfig,
+    x: u32,
+    t: u32,
+    entry_age: Option<u32>,
+) -> PolarsResult<f64> {
     // Decide if selected table is used
     let new_config = get_new_config_with_selected_table(config, entry_age)?;
 

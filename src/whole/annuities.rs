@@ -1,10 +1,12 @@
 use self::benefits::nEx;
+use crate::int_rate_convert::eff_i_to_nom_i;
+
 use super::*;
 //-----------------Basic------------------
 
-/// Due life annuity-due payable m times per year:
-/// äₓ⁽ᵐ⁾ = (1/m) × [(1 - vˣ)/(1 - v¹/ᵐ)]
-/// ₜ|äₓ⁽ᵐ⁾ = äₓ₊ₜ⁽ᵐ⁾ · ₜEₓ
+/// Life annuity-due payable m times per year:
+/// äₓ⁽ᵐ⁾ = Nₓ/Dₓ . (i/i⁽ᵐ⁾)
+/// ₜ|äₓ⁽ᵐ⁾ = ₜEₓ . (Nₓ₊ₜ/Dₓ) . (i/i⁽ᵐ⁾)
 /// Present value of 1/m paid m times per year for life.
 pub fn aax(
     config: &MortTableConfig,
@@ -16,14 +18,15 @@ pub fn aax(
     // Decide if selected table is used
     let new_config = get_new_config_with_selected_table(config, entry_age)?;
 
-    let i = new_config.int_rate.unwrap_or(0.0);
-    let m_f = m as f64;
-    let v = 1.0 / (1.0 + i);
-    let v_x = v.powf(x as f64);
-    let v_1_m = v.powf(1.0 / m_f);
-    let annuity_due = (1.0 / m_f) * ((1.0 - v_x) / (1.0 - v_1_m));
+    let nEx = nEx(&new_config, x, t, 0, None)?;
 
-    let result = annuity_due * nEx(&new_config, x, t, 0, entry_age)?;
+    let nx_t = get_value(&new_config, x + t, "Nx")?;
+    let dx = get_value(&new_config, x, "Dx")?;
+
+    let i = new_config.int_rate.unwrap_or(0.0);
+    let d_m = eff_i_to_nom_i(i, m);
+
+    let result = nEx * (nx_t / dx) * (i / d_m);
     Ok(result)
 }
 
@@ -42,9 +45,9 @@ pub fn aaxn(
     // Decide if selected table is used
     let new_config = get_new_config_with_selected_table(config, entry_age)?;
 
-    let aax_t = aax(&new_config, x, m, t, entry_age)?;
-    let nEx_tn = nEx(&new_config, x, n + t, 0, entry_age)?;
-    let aax_xtn = aax(&new_config, x + t + n, m, 0, entry_age)?;
+    let aax_t = aax(&new_config, x, m, t, None)?;
+    let nEx_tn = nEx(&new_config, x, n + t, 0, None)?;
+    let aax_xtn = aax(&new_config, x + t + n, m, 0, None)?;
     let result = aax_t - nEx_tn * aax_xtn;
     Ok(result)
 }
@@ -81,7 +84,7 @@ pub fn Iaax(
     eff_config.int_rate = Some(eff_i);
 
     // Calculate the annuity of components
-    let result = component_iaa_x * aaxn(config, x, m, 1, t, entry_age)?;
+    let result = component_iaa_x * aaxn(config, x, m, 1, t, None)?;
 
     Ok(result)
 }
@@ -103,10 +106,10 @@ pub fn Iaaxn(
     let new_config = get_new_config_with_selected_table(config, entry_age)?;
 
     // ₜ|(Iä)ₓ:ₙ̅⁽ᵐ⁾ = ₜ|(Iä)ₓ⁽ᵐ⁾ - ₜ₊ₙEₓ · ((Iä)ₓ₊ₜ₊ₙ⁽ᵐ⁾ + n · äₓ₊ₜ₊ₙ⁽ᵐ⁾)
-    let iaax_t = Iaax(&new_config, x, m, t, entry_age)?; // ₜ|(Iä)ₓ⁽ᵐ⁾
-    let nEx_tn = nEx(&new_config, x, n + t, 0, entry_age)?; // ₜ₊ₙEₓ
-    let iaax_xtn = Iaax(&new_config, x + t + n, m, 0, entry_age)?; // (Iä)ₓ₊ₜ₊ₙ⁽ᵐ⁾
-    let aax_xtn = aax(&new_config, x + t + n, m, 0, entry_age)?; // äₓ₊ₜ₊ₙ⁽ᵐ⁾
+    let iaax_t = Iaax(&new_config, x, m, t, None)?; // ₜ|(Iä)ₓ⁽ᵐ⁾
+    let nEx_tn = nEx(&new_config, x, n + t, 0, None)?; // ₜ₊ₙEₓ
+    let iaax_xtn = Iaax(&new_config, x + t + n, m, 0, None)?; // (Iä)ₓ₊ₜ₊ₙ⁽ᵐ⁾
+    let aax_xtn = aax(&new_config, x + t + n, m, 0, None)?; // äₓ₊ₜ₊ₙ⁽ᵐ⁾
     let result = iaax_t - nEx_tn * (iaax_xtn + (n as f64) * aax_xtn);
     Ok(result)
 }
@@ -129,8 +132,8 @@ pub fn Daaxn(
     let new_config = get_new_config_with_selected_table(config, entry_age)?;
 
     // ₜ|(Dä)ₓ:ₙ̅⁽ᵐ⁾ = (n+1) · ₜ|äₓ:ₙ̅⁽ᵐ⁾ - ₜ|(Iä)ₓ:ₙ̅⁽ᵐ⁾
-    let aaxn_val = aaxn(&new_config, x, n, m, t, entry_age)?; // ₜ|äₓ:ₙ̅⁽ᵐ⁾
-    let iaaxn_val = Iaaxn(&new_config, x, n, m, t, entry_age)?; // ₜ|(Iä)ₓ:ₙ̅⁽ᵐ⁾
+    let aaxn_val = aaxn(&new_config, x, n, m, t, None)?; // ₜ|äₓ:ₙ̅⁽ᵐ⁾
+    let iaaxn_val = Iaaxn(&new_config, x, n, m, t, None)?; // ₜ|(Iä)ₓ:ₙ̅⁽ᵐ⁾
     let result = (n as f64 + 1.0) * aaxn_val - iaaxn_val;
     Ok(result)
 }
@@ -152,7 +155,7 @@ pub fn gaax(
     // Decide if selected table is used
     let new_config = get_new_config_with_selected_table(config, entry_age)?;
     let adjusted_config = get_new_config_geometric_functions(&new_config, g)?;
-    let result = aax(&adjusted_config, x, m, t, entry_age)?;
+    let result = aax(&adjusted_config, x, m, t, None)?;
     Ok(result)
 }
 
@@ -173,6 +176,6 @@ pub fn gaaxn(
     // Decide if selected table is used
     let new_config = get_new_config_with_selected_table(config, entry_age)?;
     let adjusted_config = get_new_config_geometric_functions(&new_config, g)?;
-    let result = aaxn(&adjusted_config, x, n, m, t, entry_age)?;
+    let result = aaxn(&adjusted_config, x, n, m, t, None)?;
     Ok(result)
 }

@@ -14,10 +14,6 @@ pub fn Ax(config: &MortTableConfig, x: u32, t: u32, entry_age: Option<u32>) -> P
     Ok(mx / dx)
 }
 
-/// Immediate term life insurance:
-/// A¹ₓ:ₙ̅ = (Mₓ - Mₓ₊ₙ)/Dₓ
-/// ₜ|A¹ₓ:ₙ̅ = (Mₓ₊ₜ - Mₓ₊ₜ₊ₙ) / Dₓ
-///
 /// Present value of $1 paid only if death occurs within n years.
 pub fn Ax1n(
     config: &MortTableConfig,
@@ -66,7 +62,7 @@ pub fn Axn(
 ) -> PolarsResult<f64> {
     // Decide if selected table is used
     let new_config = get_new_config_with_selected_table(config, entry_age)?;
-    let result = Ax1n(&new_config, x, n, t, entry_age)? + nEx(&new_config, x, n, t, entry_age)?;
+    let result = Ax1n(&new_config, x, n, t, None)? + nEx(&new_config, x, n, t, None)?;
     Ok(result)
 }
 
@@ -118,8 +114,8 @@ pub fn IAxn(
 ) -> PolarsResult<f64> {
     // Decide if selected table is used
     let new_config = get_new_config_with_selected_table(config, entry_age)?;
-    let term = IAx1n(&new_config, x, n, t, entry_age)?;
-    let pure_endowment = (n as f64) * nEx(&new_config, x, n, t, entry_age)?;
+    let term = IAx1n(&new_config, x, n, t, None)?;
+    let pure_endowment = (n as f64) * nEx(&new_config, x, n, t, None)?;
     let result = term + pure_endowment;
     Ok(result)
 }
@@ -158,7 +154,9 @@ pub fn DAxn(
     t: u32,
     entry_age: Option<u32>,
 ) -> PolarsResult<f64> {
-    let result = DAx1n(config, x, n, t, entry_age)? + nEx(config, x, n, t, entry_age)?;
+    // Decide if selected table is used
+    let new_config = get_new_config_with_selected_table(config, entry_age)?;
+    let result = DAx1n(&new_config, x, n, t, None)? + nEx(&new_config, x, n, t, None)?;
     Ok(result)
 }
 
@@ -178,7 +176,7 @@ pub fn gAx(
     // Decide if selected table is used
     let new_config = get_new_config_with_selected_table(config, entry_age)?;
     let adjusted_config = get_new_config_geometric_functions(&new_config, g)?;
-    let result = Ax(&adjusted_config, x, t, entry_age)?;
+    let result = Ax(&adjusted_config, x, t, None)?;
     Ok(result)
 }
 
@@ -197,7 +195,7 @@ pub fn gAx1n(
     // Decide if selected table is used
     let new_config = get_new_config_with_selected_table(config, entry_age)?;
     let adjusted_config = get_new_config_geometric_functions(&new_config, g)?;
-    let result = Ax1n(&adjusted_config, x, n, t, entry_age)?;
+    let result = Ax1n(&adjusted_config, x, n, t, None)?;
     Ok(result)
 }
 
@@ -216,7 +214,7 @@ pub fn gnEx(
     // Decide if selected table is used
     let new_config = get_new_config_with_selected_table(config, entry_age)?;
     let adjusted_config = get_new_config_geometric_functions(&new_config, g)?;
-    let result = nEx(&adjusted_config, x, n, t, entry_age)?;
+    let result = nEx(&adjusted_config, x, n, t, None)?;
     Ok(result)
 }
 
@@ -232,8 +230,50 @@ pub fn gAxn(
     t: u32,
     entry_age: Option<u32>,
 ) -> PolarsResult<f64> {
-    let term = gAx1n(config, x, n, g, t, entry_age)?;
-    let pure_endowment = gnEx(config, x, n, g, t, entry_age)?;
+    // Decide if selected table is used
+    let new_config = get_new_config_with_selected_table(config, entry_age)?;
+    let term = gAx1n(&new_config, x, n, g, t, None)?;
+    let pure_endowment = gnEx(&new_config, x, n, g, t, None)?;
     let result = term + pure_endowment;
     Ok(result)
+}
+
+// ================================================
+// UNIT TESTS
+// ================================================
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::prelude::*;
+
+    #[test]
+    fn test_axn_am92_selected() {
+        // ======Question 1======:
+        // Load AM92 selected table
+        let am92_xml = MortXML::from_xlsx("data/am92.xlsx", "am92")
+            .expect("Failed to load AM92 selected table");
+
+        // Create MortTableConfig
+        let config = MortTableConfig {
+            xml: am92_xml.clone(),
+            radix: Some(100_000),
+            int_rate: Some(0.05),
+            pct: Some(1.0),
+            assumption: Some(AssumptionEnum::UDD),
+        };
+
+        // Print out the content type for verification
+        println!("Content Type: {}", config.xml.content_classification.content_type);
+
+        // Calculate  A₍₇₀₎:₃
+        let ans = Axn(&config, 70, 3, 0, Some(70)).expect("Axn calculation failed");
+
+        // Expected value: 0.8663440 (as per notebook comment)
+        let expected = 0.8663440;
+        let tol = 1e-6;
+        assert!(
+            (ans - expected).abs() < tol,
+            "Axn(70,3,0,Some(70)) = {ans}, expected {expected}"
+        );
+    }
 }

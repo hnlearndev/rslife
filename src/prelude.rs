@@ -19,6 +19,26 @@ pub use crate::xml::{AxisDef, ContentClassification, MetaData, MortXML, Table};
 // All actuarial calculation functions (implementation functions from whole.rs)
 
 #[rustfmt::skip]
+pub use crate::int_rate_convert::{
+    // From i to i
+    nom_i_to_eff_i,
+    eff_i_to_nom_i,
+    // From d to d,
+    eff_d_to_nom_d,
+    nom_d_to_eff_d,
+    // From i to d
+    eff_i_to_eff_d,
+    eff_i_to_nom_d,
+    nom_i_to_eff_d,
+    nom_i_to_nom_d,
+    // From d to i
+    eff_d_to_eff_i,
+    eff_d_to_nom_i,
+    nom_d_to_eff_i,
+    nom_d_to_nom_i,
+};
+
+#[rustfmt::skip]
 pub use crate::whole::{
     // Annuities
     aax, aaxn,
@@ -36,7 +56,6 @@ pub use crate::whole::{
     // tpx, tqx,
 };
 
-// Unified interface for whole and fractional age calculations
 pub use crate::fractional::{tpx, tqx};
 
 // Most commonly used Polars types for working with mortality tables

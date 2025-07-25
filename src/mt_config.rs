@@ -465,11 +465,13 @@ fn gen_commutation_level_3(df: DataFrame) -> PolarsResult<DataFrame> {
     let mut Px: Vec<f64> = Vec::with_capacity(cx.len());
 
     for i in 0..cx.len() {
-        let nx_value: f64 = dx[i..].iter().filter_map(|&v| v).sum();
-        Nx.push(nx_value);
-
+        // Mₓ = Σ(k=x to ω) Cₖ
         let mx_value: f64 = cx[i..].iter().filter_map(|&v| v).sum();
         Mx.push(mx_value);
+
+        // Nₓ = Σ(k=x to ω) Dₖ
+        let nx_value: f64 = dx[i..].iter().filter_map(|&v| v).sum();
+        Nx.push(nx_value);
 
         let px_value = if nx_value > 0.0 {
             mx_value / nx_value

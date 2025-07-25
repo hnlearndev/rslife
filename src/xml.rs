@@ -394,13 +394,25 @@ impl MortXML {
         // - Third column optional, must be i32 if present and named "duration"
         Self::_validate_df_schema(&df)?;
 
+        // Set content_type_val based on presence of 'duration' column
+        let has_duration_column = df
+            .get_column_names()
+            .iter()
+            .any(|c| c.as_str() == "duration");
+
+        let content_type_val = if has_duration_column {
+            "Custom data with selection"
+        } else {
+            "Custom data"
+        };
+
         // Create a dummy ContentClassification
         let content_classification = ContentClassification {
             table_identity: 0,
             provider_domain: "local".to_string(),
             provider_name: "Local DataFrame".to_string(),
             table_reference: "DataFrame Table".to_string(),
-            content_type: "Mortality/Life table".to_string(),
+            content_type: content_type_val.to_string(),
             table_name: "DataFrame Table".to_string(),
             table_description: "Table created from DataFrame".to_string(),
             comments: "No comments".to_string(),
@@ -453,7 +465,7 @@ impl MortXML {
     /// let mort_xml = MortXML::from_xlsx("data/elt15.xlsx", "female")?;
     ///
     /// // Select table with duration
-    /// let mort_xml = MortXML::from_xlsx("data/am92_select.xlsx", "AM92")?;
+    /// let mort_xml = MortXML::from_xlsx("data/am92.xlsx", "am92")?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn from_xlsx(
@@ -1637,10 +1649,7 @@ mod tests {
 
         let result = MortXML::from_df(df);
         // With u32, negative ages are impossible, so this test now passes
-        assert!(
-            result.is_ok(),
-            "Valid u32 DataFrame should pass validation"
-        );
+        assert!(result.is_ok(), "Valid u32 DataFrame should pass validation");
     }
 
     #[test]
