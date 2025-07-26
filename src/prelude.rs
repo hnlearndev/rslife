@@ -39,14 +39,15 @@ pub use crate::int_rate_convert::{
 };
 
 #[rustfmt::skip]
-pub use crate::annuties::{
+pub use crate::annuities::{
+    // Certain Annuities
+    an, aan,
     // Annuities
     aax, aaxn,
     Iaax, Iaaxn,
     Daaxn,
     gaax, gaaxn,
-}
-
+};
 
 #[rustfmt::skip]
 pub use crate::benefits::{
@@ -57,7 +58,7 @@ pub use crate::benefits::{
     gAx, gAx1n, gnEx, gAxn,
 };
 
-pub use crate::fractional::{tpx, tqx};
+pub use crate::survivals::{tpx, tqx};
 
 // Most commonly used Polars types for working with mortality tables
 pub use polars::prelude::{DataFrame, LazyFrame, PolarsError, PolarsResult, Series};

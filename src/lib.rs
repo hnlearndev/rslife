@@ -45,9 +45,9 @@
 //!
 //! // Calculate actuarial values
 //!
-//! let whole_life = Ax(&config, 35, 0, None)?;
-//! let annuity = aaxn(&config, 35, 1, 1, 0, None)?;
-//! let survival = tpx(&config, 30.0, 5.0, None)?;
+//! let whole_life = Ax(&config, 35, 0, 1, 1, None)?;
+//! let annuity = aaxn(&config, 35, 1, 0, 1, 1, None)?;
+//! let survival = tpx(&config, 30.0, 5.0, 0.0, None)?;
 //!
 //! println!("Whole life: {:.6}", whole_life);
 //! println!("Annuity: {:.6}", annuity);
@@ -63,8 +63,8 @@
 //!
 //! // Create mortality table with u32 age columns (type-safe, no negative ages)
 //! let df = df! {
-//!     "age" => [25u32, 26u32, 27u32, 28u32, 29u32],
-//!     "qx" => [0.001, 0.002, 0.003, 0.004, 0.005],
+//!     "age" => [25u32, 26, 27, 28, 29],
+//!     "qx" => [0.001f64, 0.002, 0.003, 0.004, 0.005],
 //! }?;
 //!
 //! let xml = MortXML::from_df(df)?;
@@ -76,9 +76,9 @@
 //!     assumption: Some(AssumptionEnum::UDD)
 //! };
 //!
-//! // Use with actuarial calculations
-//! let mortality_table = config.gen_mort_table(1)?;
-//! println!("Table rows: {}", mortality_table.height());
+//! // Config is ready for actuarial calculations
+//! // Custom tables can be used with all actuarial functions
+//! println!("Custom table has {} rows", config.xml.tables[0].values.height());
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
@@ -140,7 +140,6 @@
 
 pub mod annuities;
 pub mod benefits;
-pub mod helpers;
 pub mod int_rate_convert;
 pub mod mt_config;
 pub mod prelude;

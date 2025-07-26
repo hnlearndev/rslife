@@ -71,12 +71,12 @@ fn demo_elt15_female() -> Result<(), Box<dyn std::error::Error>> {
             };
 
             // Calculate various actuarial values
-            let whole_life_35 = Ax(&config, 35, 0, None)?;
-            let term_life_35_20 = Ax1n(&config, 35, 20, 0, None)?;
+            let whole_life_35 = Ax(&config, 35, 0, 1, 1, None)?;
+            let term_life_35_20 = Ax1n(&config, 35, 20, 0, 1, 1, None)?;
             let pure_endowment_35_30 = nEx(&config, 35, 30, 0, None)?;
-            let annuity_due_35_20 = aaxn(&config, 35, 20, 1, 0, None)?;
-            let survival_10p35 = tpx(&config, 10.0, 35.0, None)?;
-            let survival_30p35 = tpx(&config, 30.0, 35.0, None)?;
+            let annuity_due_35_20 = aaxn(&config, 35, 20, 0, 1, 1, None)?;
+            let survival_10p35 = tpx(&config, 35.0, 10.0, 0.0, None)?;
+            let survival_30p35 = tpx(&config, 35.0, 30.0, 0.0, None)?;
 
             println!("   Life Insurance Values:");
             println!("     Whole life (age 35): {:.6}", whole_life_35);
@@ -149,8 +149,8 @@ fn demo_am92_select() -> Result<(), Box<dyn std::error::Error>> {
                 };
 
                 println!("\n🧮 Sample calculations with AM92 data:");
-                let whole_life_40 = Ax(&config, 40, 0, None)?;
-                let survival_20p40 = tpx(&config, 20.0, 40.0, None)?;
+                let whole_life_40 = Ax(&config, 40, 0, 1, 1, None)?;
+                let survival_20p40 = tpx(&config, 40.0, 20.0, 0.0, None)?;
 
                 println!("   Whole life insurance (age 40): {:.6}", whole_life_40);
                 println!("   20-year survival from age 40: {:.6}", survival_20p40);
@@ -203,18 +203,18 @@ fn demo_ltam_ultimate() -> Result<(), Box<dyn std::error::Error>> {
                 println!("\n🧮 Comprehensive calculations with LTAM data:");
 
                 // Life insurance calculations
-                let whole_life_30 = Ax(&config, 30, 0, None)?;
-                let whole_life_50 = Ax(&config, 50, 0, None)?;
-                let term_10_age_30 = Ax1n(&config, 30, 10, 0, None)?;
+                let whole_life_30 = Ax(&config, 30, 0, 1, 1, None)?;
+                let whole_life_50 = Ax(&config, 50, 0, 1, 1, None)?;
+                let term_10_age_30 = Ax1n(&config, 30, 10, 0, 1, 1, None)?;
 
                 // Annuity calculations
-                let life_annuity_30 = aax(&config, 30, 1, 0, None)?;
-                let temp_annuity_30_20 = aaxn(&config, 30, 20, 1, 0, None)?;
+                let life_annuity_30 = aax(&config, 30, 0, 1, 1, None)?;
+                let temp_annuity_30_20 = aaxn(&config, 30, 20, 0, 1, 1, None)?;
 
                 // Survival probabilities
-                let surv_1p30 = tpx(&config, 1.0, 30.0, None)?;
-                let surv_10p30 = tpx(&config, 10.0, 30.0, None)?;
-                let surv_40p30 = tpx(&config, 40.0, 30.0, None)?;
+                let surv_1p30 = tpx(&config, 30.0, 1.0, 0.0, None)?;
+                let surv_10p30 = tpx(&config, 30.0, 10.0, 0.0, None)?;
+                let surv_40p30 = tpx(&config, 30.0, 40.0, 0.0, None)?;
 
                 println!("\n   🏥 Life Insurance Values:");
                 println!("     Whole life at age 30: {:.6}", whole_life_30);
@@ -297,8 +297,8 @@ fn demonstrate_elt15_format() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     println!("\n🧮 Actuarial calculations with sample ELT15-style data:");
-    let whole_life_35 = Ax(&config, 35, 0, None)?;
-    let survival_30p35 = tpx(&config, 30.0, 35.0, None)?;
+    let whole_life_35 = Ax(&config, 35, 0, 1, 1, None)?;
+    let survival_30p35 = tpx(&config, 35.0, 30.0, 0.0, None)?;
 
     println!("   Whole life insurance (age 35): {:.6}", whole_life_35);
     println!(
@@ -390,10 +390,10 @@ fn demonstrate_ltam_format() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("\n🧮 Comprehensive calculations with sample LTAM-style data:");
 
-    let whole_life_30 = Ax(&config, 30, 0, None)?;
-    let whole_life_50 = Ax(&config, 50, 0, None)?;
-    let annuity_30 = aax(&config, 30, 1, 0, None)?;
-    let survival_40p30 = tpx(&config, 40.0, 30.0, None)?;
+    let whole_life_30 = Ax(&config, 30, 0, 1, 1, None)?;
+    let whole_life_50 = Ax(&config, 50, 0, 1, 1, None)?;
+    let annuity_30 = aax(&config, 30, 0, 1, 1, None)?;
+    let survival_40p30 = tpx(&config, 30.0, 40.0, 0.0, None)?;
 
     println!("   🏥 Life Insurance Values:");
     println!("     Whole life at age 30: {:.6}", whole_life_30);

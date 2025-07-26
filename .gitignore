@@ -44,3 +44,6 @@ examples/*
 !examples/*.ods
 !examples/*.xlsx
 !examples/*.rs
+
+# Large reference files
+*.pdf

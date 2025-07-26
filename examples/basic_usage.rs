@@ -30,9 +30,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Performing actuarial calculations...");
 
     // Life insurance calculations
-    let whole_life = Ax(&config, 30, 0, None)?;
-    let term_20 = Ax1n(&config, 30, 20, 0, None)?;
-    let endowment_20 = Axn(&config, 30, 20, 0, None)?;
+    let whole_life = Ax(&config, 30, 0, 1, 1, None)?;
+    let term_20 = Ax1n(&config, 30, 20, 0, 1, 1, None)?;
+    let endowment_20 = Axn(&config, 30, 20, 0, 1, 1, None)?;
 
     println!("Life Insurance (age 30):");
     println!("  Whole life (Ax): {whole_life:.6}");
@@ -41,9 +41,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!();
 
     // Annuity calculations
-    let annuity_annual_due = aaxn(&config, 65, 20, 1, 0, None)?;
-    let annuity_monthly_due = aaxn(&config, 65, 20, 12, 0, None)?;
-    let annuity_life_due = aax(&config, 65, 1, 0, None)?;
+    let annuity_annual_due = aaxn(&config, 65, 20, 0, 1, 1, None)?;
+    let annuity_monthly_due = aaxn(&config, 65, 20, 0, 12, 1, None)?;
+    let annuity_life_due = aax(&config, 65, 0, 1, 1, None)?;
 
     println!("Annuities (age 65):");
     println!("  20-year annual due payments: {annuity_annual_due:.6}");
@@ -52,8 +52,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!();
 
     // Survival probability calculations
-    let survival_10_years = tpx(&config, 30.0, 10.0, None)?;
-    let mortality_10_years = tqx(&config, 30.0, 10.0, None)?;
+    let survival_10_years = tpx(&config, 30.0, 10.0, 0.0, None)?;
+    let mortality_10_years = tqx(&config, 30.0, 10.0, 0.0, None)?;
 
     println!("Survival calculations (10 years, age 30):");
     println!("  Survival probability (tpx): {survival_10_years:.6}");

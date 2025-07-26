@@ -25,8 +25,8 @@
 //!
 //! // Create custom mortality data
 //! let df = df! {
-//!     "age" => [25u32, 26u32],
-//!     "qx" => [0.0015, 0.0018],
+//!     "age" => [25u32, 26],
+//!     "qx" => [0.0015f64, 0.0018],
 //! }?;
 //!
 //! // Convert to mortality table
@@ -39,9 +39,8 @@
 //!     assumption: None,
 //! };
 //!
-//! // Generate life table
-//! let table = config.gen_mort_table(1)?;
-//! println!("Custom table rows: {}", table.height());
+//! // Config is ready for actuarial calculations
+//! println!("Custom table loaded with {} rows", config.xml.tables[0].values.height());
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
@@ -121,7 +120,7 @@ pub struct Table {
 /// Contains table metadata for discovery and regulatory compliance.
 /// The `table_identity` field is used with loading functions.
 #[allow(dead_code)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ContentClassification {
     /// Unique numeric identifier for this table (used in SOA URLs and references)
     pub table_identity: i32,
@@ -159,7 +158,7 @@ pub struct ContentClassification {
 /// Find table IDs at [mort.soa.org](https://mort.soa.org/Default.aspx).
 /// Popular tables: 1704 (2017 CSO), 912 (1980 CSO), 1076 (2001 VBT).
 #[allow(dead_code)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct MortXML {
     /// Table identification and classification metadata
     pub content_classification: ContentClassification,
@@ -394,25 +393,13 @@ impl MortXML {
         // - Third column optional, must be i32 if present and named "duration"
         Self::_validate_df_schema(&df)?;
 
-        // Set content_type_val based on presence of 'duration' column
-        let has_duration_column = df
-            .get_column_names()
-            .iter()
-            .any(|c| c.as_str() == "duration");
-
-        let content_type_val = if has_duration_column {
-            "Custom data with selection"
-        } else {
-            "Custom data"
-        };
-
         // Create a dummy ContentClassification
         let content_classification = ContentClassification {
             table_identity: 0,
             provider_domain: "local".to_string(),
             provider_name: "Local DataFrame".to_string(),
             table_reference: "DataFrame Table".to_string(),
-            content_type: content_type_val.to_string(),
+            content_type: "Custom data".to_string(),
             table_name: "DataFrame Table".to_string(),
             table_description: "Table created from DataFrame".to_string(),
             comments: "No comments".to_string(),
@@ -465,7 +452,7 @@ impl MortXML {
     /// let mort_xml = MortXML::from_xlsx("data/elt15.xlsx", "female")?;
     ///
     /// // Select table with duration
-    /// let mort_xml = MortXML::from_xlsx("data/am92.xlsx", "am92")?;
+    /// let mort_xml = MortXML::from_xlsx("data/am92_select.xlsx", "AM92")?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn from_xlsx(
