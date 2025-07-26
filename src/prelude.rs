@@ -39,21 +39,22 @@ pub use crate::int_rate_convert::{
 };
 
 #[rustfmt::skip]
-pub use crate::whole::{
+pub use crate::annuties::{
     // Annuities
     aax, aaxn,
     Iaax, Iaaxn,
     Daaxn,
     gaax, gaaxn,
+}
 
+
+#[rustfmt::skip]
+pub use crate::benefits::{
     // Benefits and Life Insurance
     Ax, Ax1n, nEx, Axn,
     IAx, IAx1n, IAxn,
     DAx1n, DAxn,
     gAx, gAx1n, gnEx, gAxn,
-
-    // Survival Probabilities
-    // tpx, tqx,
 };
 
 pub use crate::fractional::{tpx, tqx};

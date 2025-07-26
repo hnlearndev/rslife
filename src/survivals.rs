@@ -1,19 +1,29 @@
-use self::helpers::is_table_layout_approved;
-use super::*;
+use crate::helpers::{get_new_config_with_selected_table, get_value};
+use crate::mt_config::{AssumptionEnum, MortTableConfig};
+use polars::prelude::*;
 
+// =======================================
+// PUBLIC FUNCTIONS
+// =======================================
 /// Calculate ₜpₓ: probability of surviving t years from age x (fractional ages supported).
-///
+/// ₖ|ₜp = ₖ₊ₜpₓ =  ∏ₖ₌₀^{t+k-1} (1 - qₓ₊ₖ₊ₜ)
 /// Uses UDD, CFM, or HPB formulas for fractional ages/times; delegates to whole ages if both are integers.
-pub fn tpx(config: &MortTableConfig, x: f64, t: f64, entry_age: Option<u32>) -> PolarsResult<f64> {
-    if !is_table_layout_approved(config) {
-        return Err(PolarsError::ComputeError(
-            "Mortality table XML layout is not suitable for calculations".into(),
-        ));
-    }
+pub fn tpx(
+    config: &MortTableConfig,
+    x: f64,
+    t: f64,
+    k: f64,
+    entry_age: Option<u32>,
+) -> PolarsResult<f64> {
+    // Decide if selected table is used
+    let new_config = get_new_config_with_selected_table(config, entry_age)?;
+
+    // Combine t and k
+    let t = t + k;
 
     // Handle special case for whole numbers right at the start
     if x.fract() == 0.0 && t.fract() == 0.0 {
-        return whole::tpx(config, t as u32, x as u32, entry_age);
+        return _tpx_whole(&new_config, t as u32, x as u32);
     }
 
     // If not start to handle fractional ages
@@ -47,27 +57,41 @@ pub fn tpx(config: &MortTableConfig, x: f64, t: f64, entry_age: Option<u32>) -> 
         Ok(survival_rate)
     } else {
         // Case 2b:  when t > (1-s) or t > time_to_next_age
-        let survival_to_next_age = tpx(config, time_to_next_age, x, entry_age)?;
+        let survival_to_next_age = tpx(&new_config, time_to_next_age, x, 0.0, None)?;
         let remaining_time = t - time_to_next_age;
-        let survival_after = tpx(config, remaining_time, (x_whole + 1) as f64, entry_age)?;
+        let survival_after = tpx(&new_config, remaining_time, (x_whole + 1) as f64, 0.0, None)?;
         let result = survival_to_next_age * survival_after;
         Ok(result)
     }
 }
 
 /// Calculate ₜqₓ - probability of dying within t years starting at age x (fractional ages supported).
-///
+/// ₖ|ₜpₓ +  ₖ|ₜqₓ =  ₖpₓ
 /// This is the complement of [`tpx`]: ₜqₓ = 1 - ₜpₓ.
-pub fn tqx(config: &MortTableConfig, x: f64, t: f64, entry_age: Option<u32>) -> PolarsResult<f64> {
-    let result = 1.0 - tpx(config, x, t, entry_age)?;
+pub fn tqx(
+    config: &MortTableConfig,
+    x: f64,
+    t: f64,
+    k: f64,
+    entry_age: Option<u32>,
+) -> PolarsResult<f64> {
+    let result = tpx(config, x, k, 0.0, entry_age) - tpx(config, x, t, k, entry_age)?;
     Ok(result)
 }
 
-//-----------------------------------------------------------
-// UNIT TESTS
-//-----------------------------------------------------------
-#[cfg(test)]
-mod tests {
-    // use super::*;
-    // use crate::xml::MortXML;
+// =======================================
+// PRIVATE FUNCTIONS
+// =======================================
+/// Calculate ₜpₓ: probability of surviving t years from age x (whole ages only).
+///
+/// Formula: ₜpₓ = ∏(k=0 to t-1) (1 - qₓ₊ₖ)
+fn _tpx_whole(config: &MortTableConfig, x: u32, t: u32) -> PolarsResult<f64> {
+    let mut result = 1.0;
+    for age in x..(x + t) {
+        let qx = get_value(&config, age, "qx")?;
+        let px = 1.0 - qx;
+        result *= px;
+    }
+
+    Ok(result)
 }

@@ -138,10 +138,11 @@
 //! - Set `entry_age = None` for regular mortality tables, or `Some(age)` for select-ultimate tables
 //! - Fractional functions accept `f64` for `x` and `t`; whole functions use `u32`
 
-pub mod fractional;
+pub mod annuities;
+pub mod benefits;
 pub mod helpers;
 pub mod int_rate_convert;
 pub mod mt_config;
 pub mod prelude;
-pub mod whole;
+pub mod survivals;
 pub mod xml;
