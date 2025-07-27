@@ -1,89 +1,32 @@
 #![allow(non_snake_case)]
-use crate::benefits::nEx;
-use crate::int_rate_convert::eff_i_to_nom_i;
-use crate::mt_config::MortTableConfig;
+use crate::benefits::Exn;
+use crate::param_config::ParamConfig;
 use crate::survivals::tpx;
 use polars::prelude::*;
-
-// ================================================
-// ANNUITY-CERTAIN
-// ================================================
-
-// Annuity-certain in arrears:
-// ₜ| aₙ⁽ᵐ⁾ =  vᵗ . (1 - vⁿ) / i⁽ᵐ⁾
-pub fn an(n: u32, t: u32, m: u32, eff_i: f64) -> PolarsResult<f64> {
-    if n == 0 {
-        return Ok(0.0);
-    }
-
-    if eff_i < 0.0 {
-        return Err(PolarsError::ComputeError(
-            "Effective interest rate must be non-negative".into(),
-        ));
-    }
-
-    if m == 0 {
-        return Err(PolarsError::ComputeError(
-            "Number of payments per year must be greater than zero".into(),
-        ));
-    }
-
-    let i_m = eff_i_to_nom_i(eff_i, m);
-    let v = 1.0 / (1.0 + eff_i);
-    let n_f64 = n as f64;
-    let t_f64 = t as f64;
-
-    let result = v.powf(t_f64) * (1.0 - v.powf(n_f64)) / i_m;
-    Ok(result)
-}
-
-// Annuity-certain due:
-// ₜ| äₙ⁽ᵐ⁾ = vᵗ · (1 - vⁿ) / d⁽ᵐ⁾ = ₜ| aₙ⁽ᵐ⁾ * i⁽ᵐ⁾ / d⁽ᵐ⁾
-pub fn aan(n: u32, t: u32, m: u32, eff_i: f64) -> PolarsResult<f64> {
-    let d_m = eff_i_to_nom_i(eff_i, m);
-    let i_m = eff_i_to_nom_i(eff_i, m);
-    let an_value = an(n, t, m, eff_i)?;
-    let result = an_value * i_m / d_m;
-    Ok(result)
-}
-
-// =======================================
-// LIFE ANNUITY
-// =======================================
 
 //-----------------Basic------------------
 /// Life annuity-due payable m times per year:
 /// ₜ|äₓ⁽ᵐ⁾ = ₜEₓ · Σₖ₌₀^∞ (1/m . vᵏ/ᵐ . ₖ/ₘpₓ₊ₜ)
 /// Present value of 1/m paid m times per year for life.
-pub fn aax(
-    config: &MortTableConfig,
-    x: u32,
-    t: u32,
-    m: u32,
-    moment: u32,
-    entry_age: Option<u32>,
-) -> PolarsResult<f64> {
-    // Moment must be greater than 0
-    if m == 0 {
-        return Err(PolarsError::ComputeError(
-            "m  must be greater than 0".into(),
-        ));
-    }
+pub fn aax(params: &ParamConfig) -> PolarsResult<f64> {
+    // Vaidate the parameters
+    params.validate_all()?;
 
-    // Moment must be greater than 0
-    if moment == 0 {
-        return Err(PolarsError::ComputeError(
-            "Moment must be greater than 0".into(),
-        ));
-    }
+    // Required paramenters: i,x
+    let x = params.x as f64;
+    let v = 1.0 / (1.0 + params.i);
 
-    // Get the max age from the config
-    let df = &config.xml.tables[0].values;
-    let max_age = df.column("age")?.u32()?.max().unwrap();
+    // Default if not provided
+    let m = params.m.unwrap_or(1) as f64; // Default to Annual
+    let t = params.t.unwrap_or(0) as f64; // Default to 0 (no deferral)
+    let moment = params.moment.unwrap_or(1) as f64; // Default moment is 1 (mean)
 
-    let v = 1.0 / (1.0 + config.int_rate.unwrap_or(0.0));
-    let m_f64 = m as f64;
-    let moment_f64 = moment as f64;
+    // As provided - no default
+    let mt = &params.mt;
+    let entry_age = params.entry_age;
+
+    // Others
+    let max_age = mt.max_age() as f64;
 
     // Intialize
     let mut summation = 0.0;
@@ -92,86 +35,86 @@ pub fn aax(
     // Main loop to calculate the sum
     loop {
         // Break if x + t + k/m >  max_age then break the loop
-        if ((x + t) as f64 + k / m_f64) > (max_age as f64) {
+        if (x + t + k / m) > max_age {
             break;
         }
 
         // Discount factor for the k-th moment
-        let discount_factor_with_moment = v.powf(moment_f64 * k / m_f64); // vᵏ/ᵐ
-        // Probability of death
-        let probability = tpx(config, (x + t) as f64, k / m_f64, 0.0, entry_age)?; // ₖ/ₘpₓ₊ₜ
-        // Annuity payment amount
-        let benefit_amount = 1.0 / m_f64; // 1/m
+        let discount_factor_with_moment = v.powf(moment * k / m); //
+        // Probability of death  ₖ/ₘpₓ₊ₜ
+        let probability = tpx(mt, x + t, k / m, 0.0, entry_age)?;
+        // Annuity payment amount 1/m
+        let benefit_amount = 1.0 / m;
         // Aggregate the result
         summation += discount_factor_with_moment * probability * benefit_amount;
 
-        // Next k
+        // Exnt k
         k += 1.0;
     }
 
-    let result = summation * nEx(&config, x, t, moment, entry_age)?; // ₜEₓ
+    // Calculation of ₜEₓ - only term n = t. The rest are intact
+    let mut ext_param = params.clone();
+    ext_param.n = Some(t as u32);
+
+    let Ext = Exn(&ext_param)?;
+
+    // Final result
+    let result = summation * Ext;
     Ok(result)
 }
 
 /// Due temporary annuity-due payable m times per year:
 /// ₜ|äₓ:ₙ̅⁽ᵐ⁾ = ₜEₓ · Σₖ₌₀^∞ (1/m . vᵏ/ᵐ . ₖ/ₘpₓ₊ₜ)
 /// Present value of 1/m paid m times per year for up to n years.
-pub fn aaxn(
-    config: &MortTableConfig,
-    x: u32,
-    n: u32,
-    t: u32,
-    m: u32,
-    moment: u32,
-    entry_age: Option<u32>,
-) -> PolarsResult<f64> {
-    // Moment must be greater than 0
-    if m == 0 {
+pub fn aaxn(params: &ParamConfig) -> PolarsResult<f64> {
+    // Vaidate the parameters
+    params.validate_all()?;
+
+    // Required paramenters: i,x,n
+    if params.n.is_none() {
         return Err(PolarsError::ComputeError(
-            "m  must be greater than 0".into(),
+            "n must be provided for Ax1n".into(),
         ));
     }
 
-    // Moment must be greater than 0
-    if moment == 0 {
-        return Err(PolarsError::ComputeError(
-            "Moment must be greater than 0".into(),
-        ));
-    }
+    let n = params.n.unwrap() as f64;
+    let x = params.x as f64;
+    let v = 1.0 / (1.0 + params.i);
 
-    // Get the max age from the config
-    let df = &config.xml.tables[0].values;
-    let max_age = df.column("age")?.u32()?.max().unwrap();
+    // Default if not provided
+    let m = params.m.unwrap_or(1) as f64; // Default to Annual
+    let t = params.t.unwrap_or(0) as f64; // Default to 0 (no deferral)
+    let moment = params.moment.unwrap_or(1) as f64; // Default moment is 1 (mean)
 
-    // x + n must not be greater than max age
-    if x + n > max_age {
-        return Err(PolarsError::ComputeError(
-            "x + n must not be greater than max age".into(),
-        ));
-    }
-
-    let v = 1.0 / (1.0 + config.int_rate.unwrap_or(0.0));
-    let m_f64 = m as f64;
-    let moment_f64 = moment as f64;
+    // As provided - no default
+    let mt = &params.mt;
+    let entry_age = params.entry_age;
 
     // Intialize
     let mut summation = 0.0;
 
     // Main loop to calculate the sum
-    for k in 0..(n * m - 1) {
+    for k in 0..(n * m) as u32 {
         let k_f64 = k as f64;
 
         // Discount factor for the k-th moment
-        let discount_factor_with_moment = v.powf(moment_f64 * k_f64 / m_f64); // vᵏ/ᵐ
+        let discount_factor_with_moment = v.powf(moment * k_f64 / m); // vᵏ/ᵐ
         // Probability of death
-        let probability = tpx(config, (x + t) as f64, k_f64 / m_f64, 0.0, entry_age)?; // ₖ/ₘpₓ₊ₜ
+        let probability = tpx(mt, x + t, k_f64 / m, 0.0, entry_age)?; // ₖ/ₘpₓ₊ₜ
         // Annuity payment amount
-        let benefit_amount = 1.0 / m_f64; // 1/m
+        let benefit_amount = 1.0 / m; // 1/m
         // Aggregate the result
         summation += discount_factor_with_moment * probability * benefit_amount;
     }
 
-    let result = summation * nEx(&config, x, t, moment, entry_age)?; // ₜEₓ
+    // Calculation of ₜEₓ - only term n = t. The rest are intact
+    let mut ext_param = params.clone();
+    ext_param.n = Some(t as u32);
+
+    let Ext = Exn(&ext_param)?;
+
+    // Final result
+    let result = summation * Ext;
     Ok(result)
 }
 
@@ -180,35 +123,25 @@ pub fn aaxn(
 /// ₜ|(Iä)ₓ⁽ᵐ⁾ = ₜEₓ · Σₖ₌₀^∞ ([(k // m) + 1] / m . vᵏ/ᵐ . ₖ/ₘpₓ₊ₜ)
 /// Eg: for m=12, k=0, 1, ..., 11 annuity is 1/m, while k= 12, 13, ..., 23 the annuity is 2/m, etc.
 /// Present value of an increasing life annuity-due: payments of 1/m made m times per year for life, with each annual payment increasing by 1.
-pub fn Iaax(
-    config: &MortTableConfig,
-    x: u32,
-    t: u32,
-    m: u32,
-    moment: u32,
-    entry_age: Option<u32>,
-) -> PolarsResult<f64> {
-    // Moment must be greater than 0
-    if m == 0 {
-        return Err(PolarsError::ComputeError(
-            "m  must be greater than 0".into(),
-        ));
-    }
+pub fn Iaax(params: &ParamConfig) -> PolarsResult<f64> {
+    // Vaidate the parameters
+    params.validate_all()?;
 
-    // Moment must be greater than 0
-    if moment == 0 {
-        return Err(PolarsError::ComputeError(
-            "Moment must be greater than 0".into(),
-        ));
-    }
+    // Required paramenters: i,x
+    let x = params.x as f64;
+    let v = 1.0 / (1.0 + params.i);
 
-    // Get the max age from the config
-    let df = &config.xml.tables[0].values;
-    let max_age = df.column("age")?.u32()?.max().unwrap();
+    // Default if not provided
+    let m = params.m.unwrap_or(1) as f64; // Default to Annual
+    let t = params.t.unwrap_or(0) as f64; // Default to 0 (no deferral)
+    let moment = params.moment.unwrap_or(1) as f64; // Default moment is 1 (mean)
 
-    let v = 1.0 / (1.0 + config.int_rate.unwrap_or(0.0));
-    let m_f64 = m as f64;
-    let moment_f64 = moment as f64;
+    // As provided - no default
+    let mt = &params.mt;
+    let entry_age = params.entry_age;
+
+    // Others
+    let max_age = mt.max_age() as f64;
 
     // Intialize
     let mut summation = 0.0;
@@ -217,24 +150,31 @@ pub fn Iaax(
     // Main loop to calculate the sum
     loop {
         // Break if x + t + k/m >  max_age then break the loop
-        if ((x + t) as f64 + k / m_f64) > (max_age as f64) {
+        if (x + t + k / m) > max_age {
             break;
         }
 
         // Discount factor for the k-th moment vᵏ/ᵐ
-        let discount_factor_with_moment = v.powf(moment_f64 * k / m_f64);
+        let discount_factor_with_moment = v.powf(moment * k / m);
         // Probability of death ₖ/ₘpₓ₊ₜ
-        let probability = tpx(config, (x + t) as f64, k / m_f64, 0.0, entry_age)?;
+        let probability = tpx(mt, (x + t) as f64, k / m, 0.0, entry_age)?;
         // Annuity payment amount [(k // m) + 1] / m
-        let benefit_amount = ((k / m_f64).floor() + 1.0) / m_f64;
+        let benefit_amount = ((k / m).floor() + 1.0) / m;
         // Aggregate the result
         summation += discount_factor_with_moment * probability * benefit_amount;
 
-        // Next k
+        // Exnt k
         k += 1.0;
     }
 
-    let result = summation * nEx(&config, x, t, moment, entry_age)?; // ₜEₓ
+    // Calculation of ₜEₓ - only term n = t. The rest are intact
+    let mut ext_param = params.clone();
+    ext_param.n = Some(t as u32);
+
+    let Ext = Exn(&ext_param)?;
+
+    // Final result
+    let result = summation * Ext;
     Ok(result)
 }
 
@@ -242,62 +182,55 @@ pub fn Iaax(
 /// ₜ|(Iä)ₓ⁽ᵐ⁾ = ₜEₓ · Σₖ₌₀^{mn-1} ([(k // m) + 1] / m . vᵏ/ᵐ . ₖ/ₘpₓ₊ₜ)
 /// Eg: for m=12, k=0, 1, ..., 11 annuity is 1/m, while k= 12, 13, ..., 23 the annuity is 2/m, etc.
 /// Present value of an increasing life annuity-due: payments of 1/m made m times per year for n years, with each annual payment increasing by 1.
-pub fn Iaaxn(
-    config: &MortTableConfig,
-    x: u32,
-    n: u32,
-    t: u32,
-    m: u32,
-    moment: u32,
-    entry_age: Option<u32>,
-) -> PolarsResult<f64> {
-    // Moment must be greater than 0
-    if m == 0 {
+pub fn Iaaxn(params: &ParamConfig) -> PolarsResult<f64> {
+    // Vaidate the parameters
+    params.validate_all()?;
+
+    // Required paramenters: i,x,n
+    if params.n.is_none() {
         return Err(PolarsError::ComputeError(
-            "m  must be greater than 0".into(),
+            "n must be provided for Ax1n".into(),
         ));
     }
 
-    // Moment must be greater than 0
-    if moment == 0 {
-        return Err(PolarsError::ComputeError(
-            "Moment must be greater than 0".into(),
-        ));
-    }
+    let n = params.n.unwrap() as f64;
+    let x = params.x as f64;
+    let v = 1.0 / (1.0 + params.i);
 
-    // Get the max age from the config
-    let df = &config.xml.tables[0].values;
-    let max_age = df.column("age")?.u32()?.max().unwrap();
+    // Default if not provided
+    let m = params.m.unwrap_or(1) as f64; // Default to Annual
+    let t = params.t.unwrap_or(0) as f64; // Default to 0 (no deferral)
+    let moment = params.moment.unwrap_or(1) as f64; // Default moment is 1 (mean)
 
-    // x + n must not be greater than max age
-    if x + n > max_age {
-        return Err(PolarsError::ComputeError(
-            "x + n must not be greater than max age".into(),
-        ));
-    }
-
-    let v = 1.0 / (1.0 + config.int_rate.unwrap_or(0.0));
-    let m_f64 = m as f64;
-    let moment_f64 = moment as f64;
+    // As provided - no default
+    let mt = &params.mt;
+    let entry_age = params.entry_age;
 
     // Intialize
     let mut summation = 0.0;
 
     // Main loop to calculate the sum
-    for k in 0..(n * m - 1) {
+    for k in 0..(n * m) as u32 {
         let k_f64 = k as f64;
 
         // Discount factor for the k-th moment vᵏ/ᵐ
-        let discount_factor_with_moment = v.powf(moment_f64 * k_f64 / m_f64);
+        let discount_factor_with_moment = v.powf(moment * k_f64 / m);
         // Probability of death ₖ/ₘpₓ₊ₜ
-        let probability = tpx(config, (x + t) as f64, k_f64 / m_f64, 0.0, entry_age)?;
+        let probability = tpx(mt, (x + t) as f64, k_f64 / m, 0.0, entry_age)?;
         // Annuity payment amount [(k // m) + 1] / m
-        let benefit_amount = ((k_f64 / m_f64).floor() + 1.0) / m_f64;
+        let benefit_amount = ((k_f64 / m).floor() + 1.0) / m;
         // Aggregate the result
         summation += discount_factor_with_moment * probability * benefit_amount;
     }
 
-    let result = summation * nEx(&config, x, t, moment, entry_age)?; // ₜEₓ
+    // Calculation of ₜEₓ - only term n = t. The rest are intact
+    let mut ext_param = params.clone();
+    ext_param.n = Some(t as u32);
+
+    let Ext = Exn(&ext_param)?;
+
+    // Final result
+    let result = summation * Ext;
     Ok(result)
 }
 
@@ -306,63 +239,55 @@ pub fn Iaaxn(
 /// ₜ|(Iä)ₓ⁽ᵐ⁾ = ₜEₓ · Σₖ₌₀^{mn-1} ([n-(k // m)] / m. vᵏ/ᵐ . ₖ/ₘpₓ₊ₜ)
 /// Eg: for m=12, k=0, 1, ..., 11 annuity is 1/m, while k= 12, 13, ..., 23 the annuity is 2/m, etc.
 /// Present value of an decreasing life annuity-due: payments of n/m made m times per year for n years, with each annual payment decreasing by 1.
-pub fn Daaxn(
-    config: &MortTableConfig,
-    x: u32,
-    n: u32,
-    t: u32,
-    m: u32,
-    moment: u32,
-    entry_age: Option<u32>,
-) -> PolarsResult<f64> {
-    // Moment must be greater than 0
-    if m == 0 {
+pub fn Daaxn(params: &ParamConfig) -> PolarsResult<f64> {
+    // Vaidate the parameters
+    params.validate_all()?;
+
+    // Required paramenters: i,x,n
+    if params.n.is_none() {
         return Err(PolarsError::ComputeError(
-            "m  must be greater than 0".into(),
+            "n must be provided for Ax1n".into(),
         ));
     }
 
-    // Moment must be greater than 0
-    if moment == 0 {
-        return Err(PolarsError::ComputeError(
-            "Moment must be greater than 0".into(),
-        ));
-    }
+    let n = params.n.unwrap() as f64;
+    let x = params.x as f64;
+    let v = 1.0 / (1.0 + params.i);
 
-    // Get the max age from the config
-    let df = &config.xml.tables[0].values;
-    let max_age = df.column("age")?.u32()?.max().unwrap();
+    // Default if not provided
+    let m = params.m.unwrap_or(1) as f64; // Default to Annual
+    let t = params.t.unwrap_or(0) as f64; // Default to 0 (no deferral)
+    let moment = params.moment.unwrap_or(1) as f64; // Default moment is 1 (mean)
 
-    // x + n must not be greater than max age
-    if x + n > max_age {
-        return Err(PolarsError::ComputeError(
-            "x + n must not be greater than max age".into(),
-        ));
-    }
-
-    let v = 1.0 / (1.0 + config.int_rate.unwrap_or(0.0));
-    let m_f64 = m as f64;
-    let moment_f64 = moment as f64;
-    let n_f64 = n as f64;
+    // As provided - no default
+    let mt = &params.mt;
+    let entry_age = params.entry_age;
 
     // Intialize
     let mut summation = 0.0;
 
     // Main loop to calculate the sum
-    for k in 0..(n * m - 1) {
+    for k in 0..(n * m) as u32 {
         let k_f64 = k as f64;
 
         // Discount factor for the k-th moment vᵏ/ᵐ
-        let discount_factor_with_moment = v.powf(moment_f64 * k_f64 / m_f64);
+        let discount_factor_with_moment = v.powf(moment * k_f64 / m);
         // Probability of death ₖ/ₘpₓ₊ₜ
-        let probability = tpx(config, (x + t) as f64, k_f64 / m_f64, 0.0, entry_age)?;
+        let probability = tpx(mt, (x + t) as f64, k_f64 / m, 0.0, entry_age)?;
         // Annuity payment amount [n-(k // m) + 1] / m
-        let benefit_amount = (n_f64 - (k_f64 / m_f64).floor()) / m_f64;
+        let benefit_amount = (n - (k_f64 / m).floor()) / m;
         // Aggregate the result
         summation += discount_factor_with_moment * probability * benefit_amount;
     }
 
-    let result = summation * nEx(&config, x, t, moment, entry_age)?; // ₜEₓ
+    // Calculation of ₜEₓ - only term n = t. The rest are intact
+    let mut ext_param = params.clone();
+    ext_param.n = Some(t as u32);
+
+    let Ext = Exn(&ext_param)?;
+
+    // Final result
+    let result = summation * Ext;
     Ok(result)
 }
 
@@ -372,17 +297,13 @@ pub fn Daaxn(
 ///
 /// Payments of 1/m are made m times per year for life, starting immediately,
 /// with each annual payment increasing by a factor of (1+g) each year (i.e., geometric progression).
-pub fn gaax(
-    config: &MortTableConfig,
-    x: u32,
-    g: f64,
-    t: u32,
-    m: u32,
-    moment: u32,
-    entry_age: Option<u32>,
-) -> PolarsResult<f64> {
-    let new_config = get_new_config_geometric_functions(config, g)?;
-    let result = aax(&new_config, x, t, m, moment, entry_age)?;
+pub fn gaax(params: &ParamConfig, g: f64) -> PolarsResult<f64> {
+    // Replace the effective interest rate with the adjusted one
+    let new_int_rate = (1.0 + params.i) / (1.0 + g) - 1.0;
+    let mut new_params = params.clone();
+    new_params.i = new_int_rate;
+
+    let result = aax(&new_params)?;
     Ok(result)
 }
 
@@ -391,36 +312,44 @@ pub fn gaax(
 ///
 /// Payments of 1/m are made m times per year for n years, starting immediately,
 /// with each annual payment increasing by a factor of (1+g) each year (i.e., geometric progression).
-pub fn gaaxn(
-    config: &MortTableConfig,
-    x: u32,
-    n: u32,
-    g: f64,
-    t: u32,
-    m: u32,
-    moment: u32,
-    entry_age: Option<u32>,
-) -> PolarsResult<f64> {
-    let adjusted_config = get_new_config_geometric_functions(config, g)?;
-    let result = aaxn(&adjusted_config, x, n, t, m, moment, entry_age)?;
-    Ok(result)
-}
-
-// ================================================
-// PRIVATE FUNCTIONS
-// ================================================
-fn get_new_config_geometric_functions(
-    config: &MortTableConfig,
-    g: f64,
-) -> PolarsResult<MortTableConfig> {
+pub fn gaaxn(params: &ParamConfig, g: f64) -> PolarsResult<f64> {
     // Replace the effective interest rate with the adjusted one
-    let i = config.int_rate.unwrap();
-    let int_rate = (1.0 + i) / (1.0 + g) - 1.0;
-    let mut new_config = config.clone();
-    new_config.int_rate = Some(int_rate);
-    Ok(new_config)
+    let new_int_rate = (1.0 + params.i) / (1.0 + g) - 1.0;
+    let mut new_params = params.clone();
+    new_params.i = new_int_rate;
+
+    let result = aaxn(&new_params)?;
+    Ok(result)
 }
 
 // ================================================
 // UNIT TESTS
 // ================================================
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::mt_config::MortTableConfig;
+    use crate::xml::MortXML;
+    use approx::assert_abs_diff_eq;
+
+    #[test]
+    fn test_fn_Iax_annuities_cm1() {
+        // April 2025 CM1 question 1
+        #[allow(non_snake_case)]
+        // Load AM92 selected table
+        let am92_xml = MortXML::from_xlsx("data/am92.xlsx", "am92")
+            .expect("Failed to load AM92 selected table");
+
+        // Create MortTableConfig
+        let mt = MortTableConfig::builder().xml(am92_xml).build();
+
+        // Create ParamConfig
+        let params = ParamConfig::builder().mt(mt).i(0.04).x(50).build();
+
+        // Calculate  A₍₇₀₎:₃
+        let ans = Iaax(&params).unwrap();
+        let expected = 231.007;
+        // Lower down the precision to 4 decimal places since the expected value is rounded
+        assert_abs_diff_eq!(ans, expected, epsilon = 1e-4);
+    }
+}

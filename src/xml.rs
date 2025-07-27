@@ -332,11 +332,11 @@ impl MortXML {
     /// ## Supported DataFrame Schemas
     ///
     /// **Ultimate Rate Tables:**
-    /// - `age: i32, qx: f64` - Mortality rates by age
+    /// - `age: i32, tqx: f64` - Mortality rates by age
     /// - `age: i32, lx: f64` - Life counts by age (note: must be f64, not i32)
     ///
     /// **Select Rate Tables:**
-    /// - `age: i32, qx: f64, duration: i32` - Mortality rates by age and duration since entry
+    /// - `age: i32, tqx: f64, duration: i32` - Mortality rates by age and duration since entry
     /// - `age: i32, lx: f64, duration: i32` - Life counts by age and duration since entry
     ///
     /// # Generated Metadata
@@ -448,7 +448,7 @@ impl MortXML {
     /// ```rust, ignore
     /// use rslife::xml::MortXML;
     ///
-    /// // Ultimate table with qx values
+    /// // Ultimate table with tqx values
     /// let mort_xml = MortXML::from_xlsx("data/elt15.xlsx", "female")?;
     ///
     /// // Select table with duration
@@ -501,7 +501,7 @@ impl MortXML {
                     let val = Self::_parse_xlsx_u32_cell(Some(cell), row_num, col_name)?;
                     AnyValue::UInt32(val)
                 } else {
-                    // Parse as f64 for all other columns (qx, lx, etc.)
+                    // Parse as f64 for all other columns (tqx, lx, etc.)
                     let val = Self::_parse_xlsx_f64_cell(Some(cell), row_num, col_name)?;
                     AnyValue::Float64(val)
                 };
@@ -548,7 +548,7 @@ impl MortXML {
     /// ```rust, ignore
     /// use rslife::xml::MortXML;
     ///
-    /// // Ultimate table with qx values
+    /// // Ultimate table with tqx values
     /// let mort_xml = MortXML::from_ods("data/ltam_standard_ultimate.ods", "ltam")?;
     ///
     /// // Select table with duration
@@ -602,7 +602,7 @@ impl MortXML {
                     let val = Self::_parse_ods_u32_cell(cell_value, row_num, col_name)?;
                     AnyValue::UInt32(val)
                 } else {
-                    // Parse as f64 for all other columns (qx, lx, etc.)
+                    // Parse as f64 for all other columns (tqx, lx, etc.)
                     let val = Self::_parse_ods_f64_cell(cell_value, row_num, col_name)?;
                     AnyValue::Float64(val)
                 };
@@ -655,12 +655,12 @@ impl MortXML {
 
         // Check number of columns (must be 2 or 3)
         if num_cols < 2 {
-            return Err("DataFrame must have at least 2 columns (age and qx/lx)".into());
+            return Err("DataFrame must have at least 2 columns (age and tqx/lx)".into());
         }
 
         if num_cols > 3 {
             return Err(
-                "DataFrame must have at most 3 columns (age, qx/lx, optional duration)".into(),
+                "DataFrame must have at most 3 columns (age, tqx/lx, optional duration)".into(),
             );
         }
 
@@ -686,7 +686,7 @@ impl MortXML {
         let value_col_name = value_col.name();
         if value_col_name != "qx" && value_col_name != "lx" {
             return Err(format!(
-                "Second column must be named 'qx' or 'lx', found '{value_col_name}'"
+                "Second column must be named 'tqx' or 'lx', found '{value_col_name}'"
             )
             .into());
         }
@@ -742,7 +742,7 @@ impl MortXML {
             if let Ok(Some(min_val)) = value_series.min::<f64>() {
                 if min_val < 0.0 {
                     return Err(format!(
-                        "Mortality rate values (qx) must be non-negative, found minimum: {min_val}"
+                        "Mortality rate values (tqx) must be non-negative, found minimum: {min_val}"
                     )
                     .into());
                 }
@@ -750,7 +750,7 @@ impl MortXML {
             if let Ok(Some(max_val)) = value_series.max::<f64>() {
                 if max_val > 1.0 {
                     return Err(format!(
-                        "Mortality rate values (qx) must be ≤ 1.0, found maximum: {max_val}"
+                        "Mortality rate values (tqx) must be ≤ 1.0, found maximum: {max_val}"
                     )
                     .into());
                 }
@@ -1295,7 +1295,7 @@ mod tests {
 
         let df = &mort_xml.tables[0].values;
         assert!(df.height() > 0, "DataFrame is empty");
-        assert!(df.column("qx").is_ok(), "No 'qx' column");
+        assert!(df.column("qx").is_ok(), "No 'tqx' column");
 
         // Check a random value (first row)
         let values = df.column("qx").unwrap();
@@ -1331,7 +1331,7 @@ mod tests {
 
         let df = &mort_xml.tables[0].values;
         assert!(df.height() > 0, "DataFrame is empty");
-        assert!(df.column("qx").is_ok(), "No 'qx' column");
+        assert!(df.column("qx").is_ok(), "No 'tqx' column");
 
         // Verify content classification
         assert!(
@@ -1373,7 +1373,7 @@ mod tests {
                 // Verify DataFrame structure
                 let df = &mort_xml.tables[0].values;
                 assert!(df.column("age").is_ok(), "Should have 'age' column");
-                assert!(df.column("qx").is_ok(), "Should have 'qx' column");
+                assert!(df.column("qx").is_ok(), "Should have 'tqx' column");
 
                 // Check some sample values
                 let age_col = df.column("age").unwrap();
@@ -1382,18 +1382,18 @@ mod tests {
                 // First age should be 0
                 assert_eq!(age_col.get(0).unwrap().try_extract::<u32>().unwrap(), 0);
 
-                // First qx should be around 0.00632 (from examine output)
+                // First tqx should be around 0.00632 (from examine output)
                 let first_qx = qx_col.get(0).unwrap().try_extract::<f64>().unwrap();
                 assert!(
                     (first_qx - 0.00632).abs() < 0.0001,
-                    "First qx should be approximately 0.00632"
+                    "First tqx should be approximately 0.00632"
                 );
 
                 println!(
                     "  First age: {}",
                     age_col.get(0).unwrap().try_extract::<u32>().unwrap()
                 );
-                println!("  First qx: {:.5}", first_qx);
+                println!("  First tqx: {:.5}", first_qx);
             }
             Err(e) => {
                 panic!("Failed to load XLSX file: {}", e);
@@ -1440,7 +1440,10 @@ mod tests {
             table.values.column("age").is_ok(),
             "Should have 'age' column"
         );
-        assert!(table.values.column("qx").is_ok(), "Should have 'qx' column");
+        assert!(
+            table.values.column("qx").is_ok(),
+            "Should have 'tqx' column"
+        );
 
         // Verify content classification defaults
         let classification = &mort_xml.content_classification;
@@ -1499,7 +1502,7 @@ mod tests {
     fn test_dataframe_schema_validation_valid_qx() {
         use polars::prelude::*;
 
-        // Test valid DataFrame with qx column
+        // Test valid DataFrame with tqx column
         let df = df! {
             "age" => [25u32, 26u32, 27u32],
             "qx" => [0.0015f64, 0.0018f64, 0.0020f64],
@@ -1507,7 +1510,7 @@ mod tests {
         .expect("Failed to create DataFrame");
 
         let result = MortXML::from_df(df);
-        assert!(result.is_ok(), "Valid qx DataFrame should pass validation");
+        assert!(result.is_ok(), "Valid tqx DataFrame should pass validation");
     }
 
     #[test]
@@ -1561,7 +1564,7 @@ mod tests {
             "DataFrame with wrong column name should fail validation"
         );
         let error_msg = result.unwrap_err().to_string();
-        assert!(error_msg.contains("Second column must be named 'qx' or 'lx'"));
+        assert!(error_msg.contains("Second column must be named 'tqx' or 'lx'"));
     }
 
     #[test]
@@ -1643,7 +1646,7 @@ mod tests {
     fn test_dataframe_schema_validation_invalid_qx_values() {
         use polars::prelude::*;
 
-        // Test DataFrame with qx values > 1.0
+        // Test DataFrame with tqx values > 1.0
         let df = df! {
             "age" => [25u32, 26u32, 27u32],
             "qx" => [0.5f64, 1.5f64, 0.8f64],  // 1.5 > 1.0
@@ -1653,10 +1656,10 @@ mod tests {
         let result = MortXML::from_df(df);
         assert!(
             result.is_err(),
-            "DataFrame with qx > 1.0 should fail validation"
+            "DataFrame with tqx > 1.0 should fail validation"
         );
         let error_msg = result.unwrap_err().to_string();
-        assert!(error_msg.contains("Mortality rate values (qx) must be ≤ 1.0"));
+        assert!(error_msg.contains("Mortality rate values (tqx) must be ≤ 1.0"));
     }
 
     #[test]

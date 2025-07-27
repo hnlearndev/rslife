@@ -2,6 +2,9 @@
 /src/result*/
 /result*/
 
+# Exclude diagrams folder for now
+diagrams/
+
 # Rust build output
 **/target/
 **/*.rs.bk

@@ -42,8 +42,8 @@
 #![allow(non_snake_case)] // Allow actuarial notation (gen_Ax_IAx, etc.)
 
 use crate::xml::MortXML;
+use bon::Builder;
 use garde::Validate;
-
 /// Mortality assumptions for fractional age calculations.
 ///
 /// Determines how mortality is distributed within age intervals, affecting
@@ -70,7 +70,7 @@ pub enum AssumptionEnum {
 /// rates to complete commutation functions for actuarial present value calculations.
 ///
 /// See [`MortTableConfig::gen_mort_table`] for detailed usage and examples.
-#[derive(Debug, Clone, Validate)]
+#[derive(Debug, Clone, Validate, Builder)]
 #[garde(allow_unvalidated)]
 pub struct MortTableConfig {
     /// Source mortality data (must contain exactly one age-based table).
@@ -83,9 +83,6 @@ pub struct MortTableConfig {
     /// Mortality rate multiplier. Examples: 1.0 (standard), 0.75 (preferred), 0.5 (reduced).
     #[garde(custom(validate_pct))]
     pub pct: Option<f64>,
-
-    /// Interest rate for commutation functions (e.g., 0.03 for 3%). Required for detail levels 3+.
-    pub int_rate: Option<f64>,
 
     /// Mortality assumption for fractional ages (reserved for future implementation).
     pub assumption: Option<AssumptionEnum>,
@@ -105,17 +102,30 @@ fn validate_pct(value: &Option<f64>, _context: &()) -> garde::Result {
 }
 
 impl MortTableConfig {
-    /// Validate with cross-field validation
-    pub fn validate_all(&self) -> Result<(), String> {
-        // First run garde's built-in validations
-        if let Err(e) = self.validate() {
-            return Err(e.to_string());
+    pub fn min_age(&self) -> u32 {
+        // Get the first table's age column and find the minimum age
+        if let Some(table) = self.xml.tables.first() {
+            if let Ok(age_column) = table.values.column("age") {
+                if let Ok(Some(min_val)) = age_column.as_materialized_series().min::<u32>() {
+                    return min_val;
+                }
+            }
         }
+        // Default to 0 if no age data is available
+        0
+    }
 
-        // Dummy validation for consistency
-        // Then check cross-field validation: entry_age cannot exceed age_x
-
-        Ok(())
+    pub fn max_age(&self) -> u32 {
+        // Get the first table's age column and find the maximum age
+        if let Some(table) = self.xml.tables.first() {
+            if let Ok(age_column) = table.values.column("age") {
+                if let Ok(Some(max_val)) = age_column.as_materialized_series().max::<u32>() {
+                    return max_val;
+                }
+            }
+        }
+        // Default to 0 if no age data is available
+        0
     }
 }
 
@@ -124,9 +134,8 @@ impl Default for MortTableConfig {
     fn default() -> Self {
         MortTableConfig {
             xml: MortXML::default(),
-            radix: None,
+            radix: Some(100_000),
             pct: Some(1.0),
-            int_rate: None,
             assumption: Some(AssumptionEnum::UDD),
         }
     }
@@ -145,7 +154,6 @@ mod tests {
             xml: MortXML::default(),
             radix: None,
             pct: None, // Valid: None is allowed
-            int_rate: None,
             assumption: None,
         };
 
@@ -161,7 +169,6 @@ mod tests {
                 xml: MortXML::default(),
                 radix: None,
                 pct: Some(pct_val), // Valid: > 0.0
-                int_rate: None,
                 assumption: None,
             };
 
@@ -175,7 +182,6 @@ mod tests {
             xml: MortXML::default(),
             radix: None,
             pct: Some(0.0), // Invalid: cannot be 0.0
-            int_rate: None,
             assumption: None,
         };
 
@@ -195,7 +201,6 @@ mod tests {
                 xml: MortXML::default(),
                 radix: None,
                 pct: Some(pct_val), // Negative values are allowed (might represent special cases)
-                int_rate: None,
                 assumption: None,
             };
 
@@ -215,7 +220,6 @@ mod tests {
             xml: MortXML::default(),
             radix: Some(0), // Invalid: < 1
             pct: Some(0.5), // Valid
-            int_rate: None,
             assumption: None,
         };
 
@@ -229,7 +233,6 @@ mod tests {
             xml: MortXML::default(),
             radix: Some(0), // Invalid: < 1 (built-in validation)
             pct: Some(0.0), // Invalid: cannot be 0.0 (custom validation)
-            int_rate: None,
             assumption: None,
         };
 
@@ -255,7 +258,6 @@ mod tests {
             xml: MortXML::default(),
             radix: Some(100_000),
             pct: Some(1.0), // 100% of standard rates
-            int_rate: Some(0.03),
             assumption: Some(AssumptionEnum::UDD),
         };
         assert!(standard.validate().is_ok());
@@ -265,7 +267,6 @@ mod tests {
             xml: MortXML::default(),
             radix: Some(100_000),
             pct: Some(0.75), // 75% of standard rates
-            int_rate: Some(0.03),
             assumption: Some(AssumptionEnum::CFM),
         };
         assert!(preferred.validate().is_ok());
@@ -275,7 +276,6 @@ mod tests {
             xml: MortXML::default(),
             radix: Some(50_000),
             pct: Some(1.5), // 150% of standard rates
-            int_rate: Some(0.04),
             assumption: Some(AssumptionEnum::HPB),
         };
         assert!(substandard.validate().is_ok());
@@ -288,7 +288,6 @@ mod tests {
             xml: MortXML::default(),
             radix: None,
             pct: Some(0.001), // Very small but > 0.0
-            int_rate: None,
             assumption: None,
         };
 

@@ -13,8 +13,10 @@
 // Core mortality table types and configuration
 pub use crate::mt_config::{AssumptionEnum, MortTableConfig};
 
+pub use crate::param_config::ParamConfig;
+
 // XML data loading and parsing
-pub use crate::xml::{AxisDef, ContentClassification, MetaData, MortXML, Table};
+pub use crate::xml::{ContentClassification, MortXML};
 
 // All actuarial calculation functions (implementation functions from whole.rs)
 
@@ -39,9 +41,15 @@ pub use crate::int_rate_convert::{
 };
 
 #[rustfmt::skip]
-pub use crate::annuities::{
+pub use crate::annuities_certain::{
     // Certain Annuities
     an, aan,
+};
+
+pub use crate::survivals::{tpx, tqx};
+
+#[rustfmt::skip]
+pub use crate::annuities::{
     // Annuities
     aax, aaxn,
     Iaax, Iaaxn,
@@ -52,13 +60,11 @@ pub use crate::annuities::{
 #[rustfmt::skip]
 pub use crate::benefits::{
     // Benefits and Life Insurance
-    Ax, Ax1n, nEx, Axn,
+    Ax, Ax1n, Exn, Axn,
     IAx, IAx1n, IAxn,
     DAx1n, DAxn,
-    gAx, gAx1n, gnEx, gAxn,
+    gAx, gAx1n, gExn, gAxn,
 };
-
-pub use crate::survivals::{tpx, tqx};
 
 // Most commonly used Polars types for working with mortality tables
 pub use polars::prelude::{DataFrame, LazyFrame, PolarsError, PolarsResult, Series};

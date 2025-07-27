@@ -20,6 +20,7 @@ roxmltree = "0.20.0"
 spreadsheet-ods = "0.25.0"
 icu_locid = "1.1"
 garde = { version = "0.20", features = ["derive"] }
+bon = "3.6.5"
 
 [dev-dependencies]
 approx = "0.5"

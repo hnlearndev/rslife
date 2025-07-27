@@ -5,7 +5,7 @@ use polars::prelude::*;
 // PUBLIC FUNCTIONS
 // =======================================
 /// Calculate ₜpₓ: probability of surviving t years from age x (fractional ages supported).
-/// ₖ|ₜp = ₖ₊ₜpₓ =  ∏ₖ₌₀^{t+k-1} (1 - qₓ₊ₖ₊ₜ)
+/// ₖ|ₜp = ₖ₊ₜpₓ =  ∏ₖ₌₀^{t+k-1} (1 - qₓ₊ₖ₊ₜ) ✅
 /// Uses UDD, CFM, or HPB formulas for fractional ages/times; delegates to whole ages if both are integers.
 pub fn tpx(
     config: &MortTableConfig,
@@ -30,8 +30,8 @@ pub fn tpx(
     let x_frac = x.fract(); // s
     let time_to_next_age = 1.0 - x_frac; // always between 0 and 1
 
-    // Get mortality rate for age n (percentage already applied in qx function)
-    let qx = get_qx(&new_config, x_whole).unwrap_or(0.0);
+    // Get mortality rate for age n (percentage already applied in tqx function)
+    let tqx = get_qx(&new_config, x_whole).unwrap_or(0.0);
 
     if t <= time_to_next_age {
         // Case 2a: when t ≤ (1-s) or t <= time_to_next_age
@@ -44,9 +44,9 @@ pub fn tpx(
         // ₜqₓ₊ₛ = t · qₓ / (1 + s · qₓ)
         // ₜpₓ₊ₛ = 1 - t · qₓ / (1 + s · qₓ)
         let survival_rate = match config.assumption {
-            Some(AssumptionEnum::UDD) => 1.0 - t * qx / (1.0 - x_frac * qx),
-            Some(AssumptionEnum::CFM) => (1.0 - qx).powf(t),
-            Some(AssumptionEnum::HPB) => 1.0 - t * qx / (1.0 + x_frac * qx),
+            Some(AssumptionEnum::UDD) => 1.0 - t * tqx / (1.0 - x_frac * tqx),
+            Some(AssumptionEnum::CFM) => (1.0 - tqx).powf(t),
+            Some(AssumptionEnum::HPB) => 1.0 - t * tqx / (1.0 + x_frac * tqx),
             _ => {
                 return Err(PolarsError::ComputeError(
                     "Unsupported assumption for fractional age".into(),
@@ -65,7 +65,7 @@ pub fn tpx(
 }
 
 /// Calculate ₜqₓ - probability of dying within t years starting at age x (fractional ages supported).
-/// ₖ|ₜpₓ +  ₖ|ₜqₓ =  ₖpₓ
+/// ₖ|ₜpₓ +  ₖ|ₜqₓ =  ₖpₓ ✅
 pub fn tqx(
     config: &MortTableConfig,
     x: f64,
@@ -88,8 +88,8 @@ pub fn tqx(
 fn tpx_whole(config: &MortTableConfig, x: u32, t: u32) -> PolarsResult<f64> {
     let mut result = 1.0;
     for age in x..(x + t) {
-        let qx = get_qx(config, age)?;
-        let px = 1.0 - qx;
+        let tqx = get_qx(config, age)?;
+        let px = 1.0 - tqx;
         result *= px;
     }
 
@@ -244,7 +244,7 @@ fn _get_selected_mortality_table(
         duration = u32::min(duration + 1, max_duration); // Cap duration to max_duration
     }
 
-    // Create a new DataFrame with the selected ages and qx values
+    // Create a new DataFrame with the selected ages and tqx values
     let result = DataFrame::new(vec![
         Series::new("age".into(), age_vec).into_column(),
         Series::new(value_column_name.into(), value_vec).into_column(),
@@ -268,13 +268,13 @@ fn get_qx(config: &MortTableConfig, x: u32) -> PolarsResult<f64> {
         return _get_qx(config, x);
     } else {
         return Err(PolarsError::InvalidOperation(
-            "Mortality table does not contain qx or lx column".into(),
+            "Mortality table does not contain tqx or lx column".into(),
         ));
     }
 }
 
 fn _get_qx(config: &MortTableConfig, x: u32) -> PolarsResult<f64> {
-    // Check if table contains column qx
+    // Check if table contains column tqx
     let df = &config.xml.tables[0].values;
 
     let filtered_df = df
@@ -337,6 +337,7 @@ fn _get_qx_from_lx(config: &MortTableConfig, x: u32) -> PolarsResult<f64> {
 // ================================================
 // UNIT TESTS
 // ================================================
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -352,11 +353,10 @@ mod tests {
             .expect("Failed to load AM92 selected table");
 
         // Create MortTableConfig
-        let config = MortTableConfig {
-            xml: am92_xml,
-            assumption: Some(AssumptionEnum::UDD),
-            ..Default::default()
-        };
+        let config = MortTableConfig::builder()
+            .xml(am92_xml)
+            .assumption(AssumptionEnum::UDD)
+            .build();
 
         // Calculate  ₀.₅p₅₈
         let answer = tpx(&config, 58.0, 0.5, 0.0, None).unwrap();
@@ -372,11 +372,10 @@ mod tests {
             .expect("Failed to load PFA92C20 table");
 
         // Create MortTableConfig
-        let config = MortTableConfig {
-            xml: pfa92_xml,
-            assumption: Some(AssumptionEnum::CFM),
-            ..Default::default()
-        };
+        let config = MortTableConfig::builder()
+            .xml(pfa92_xml)
+            .assumption(AssumptionEnum::CFM)
+            .build();
 
         // Calculate  ₃p₆₂.₅
         let ans = tpx(&config, 62.5, 3.0, 0.0, None).unwrap();
@@ -392,11 +391,10 @@ mod tests {
             .expect("Failed to load PFA92C20 table");
 
         // Create MortTableConfig
-        let config = MortTableConfig {
-            xml: pfa92_xml,
-            assumption: Some(AssumptionEnum::UDD),
-            ..Default::default()
-        };
+        let config = MortTableConfig::builder()
+            .xml(pfa92_xml)
+            .assumption(AssumptionEnum::UDD)
+            .build();
 
         // Calculate  ₃p₆₂.₅
         let ans = tpx(&config, 62.5, 3.0, 0.0, None).unwrap();
@@ -412,11 +410,10 @@ mod tests {
             MortXML::from_xlsx("data/am92.xlsx", "am92").expect("Failed to load AM92 table");
 
         // Create MortTableConfig
-        let config = MortTableConfig {
-            xml: am92_xml,
-            assumption: Some(AssumptionEnum::UDD),
-            ..Default::default()
-        };
+        let config = MortTableConfig::builder()
+            .xml(am92_xml)
+            .assumption(AssumptionEnum::UDD)
+            .build();
 
         // Calculate  ₃p₆₂.₅
         let ans = tpx(&config, 42.0, 2.0, 0.0, Some(42)).unwrap();
@@ -432,11 +429,10 @@ mod tests {
             MortXML::from_xlsx("data/am92.xlsx", "am92").expect("Failed to load AM92 table");
 
         // Create MortTableConfig
-        let config = MortTableConfig {
-            xml: am92_xml,
-            assumption: Some(AssumptionEnum::UDD),
-            ..Default::default()
-        };
+        let config = MortTableConfig::builder()
+            .xml(am92_xml)
+            .assumption(AssumptionEnum::UDD)
+            .build();
 
         // Calculate ₃q(₄₀)₊₁
         let ans = tqx(&config, 41.0, 3.0, 0.0, Some(40)).unwrap();
@@ -452,14 +448,13 @@ mod tests {
             MortXML::from_xlsx("data/am92.xlsx", "am92").expect("Failed to load AM92 table");
 
         // Create MortTableConfig
-        let config = MortTableConfig {
-            xml: am92_xml,
-            assumption: Some(AssumptionEnum::UDD),
-            ..Default::default()
-        };
+        let config = MortTableConfig::builder()
+            .xml(am92_xml)
+            .assumption(AssumptionEnum::UDD)
+            .build();
 
         // Calculate ₂|q(₄₁)₊₁
-        let ans = tqx(&config, 42.0, 0.0, 2.0, Some(41)).unwrap();
+        let ans = tqx(&config, 42.0, 1.0, 2.0, Some(41)).unwrap();
         let expected = 0.001324;
         assert_abs_diff_eq!(ans, expected, epsilon = 1e-6);
     }

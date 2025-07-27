@@ -1,5 +1,9 @@
-// Example demonstrating loading mortality tables from real XLSX files
-// This demo uses actual mortality data files: elt15.xlsx, am92_select.xlsx, and ltam_standard_ultimate.xlsx
+//! # RSLife Custom Data Demo
+//!
+//! This example demonstrates loading mortality tables from custom data sources
+//! including XLSX files and programmatically created DataFrames.
+//! Shows both struct literal and builder pattern usage.
+
 use polars::df;
 use rslife::prelude::*;
 
@@ -60,23 +64,33 @@ fn demo_elt15_female() -> Result<(), Box<dyn std::error::Error>> {
                 println!("{}", sample);
             }
 
-            // Perform actuarial calculations with ELT15 data
-            println!("\n🧮 Actuarial calculations with ELT15 Female data:");
-            let config = MortTableConfig {
+            // Perform actuarial calculations with ELT15 data using struct literals
+            println!("\n🧮 Actuarial calculations with ELT15 Female data (using struct literals):");
+            let mt_config = MortTableConfig {
                 xml,
                 radix: Some(100_000),
-                int_rate: Some(0.03),
-                pct: Some(0.01),
+                pct: Some(1.0),
                 assumption: Some(AssumptionEnum::UDD),
             };
 
-            // Calculate various actuarial values
-            let whole_life_35 = Ax(&config, 35, 0, 1, 1, None)?;
-            let term_life_35_20 = Ax1n(&config, 35, 20, 0, 1, 1, None)?;
-            let pure_endowment_35_30 = nEx(&config, 35, 30, 0, None)?;
-            let annuity_due_35_20 = aaxn(&config, 35, 20, 0, 1, 1, None)?;
-            let survival_10p35 = tpx(&config, 35.0, 10.0, 0.0, None)?;
-            let survival_30p35 = tpx(&config, 35.0, 30.0, 0.0, None)?;
+            let params = ParamConfig {
+                mt: mt_config,
+                i: 0.03,
+                x: 35,
+                n: Some(20),
+                t: None,
+                m: Some(1),
+                moment: Some(1),
+                entry_age: None,
+            };
+
+            // Calculate various actuarial values using new API
+            let whole_life_35 = Ax(&params)?;
+            let term_life_35_20 = Ax1n(&params)?;
+            let pure_endowment_35_30 = Exn(&params)?;
+            let annuity_due_35_20 = aaxn(&params)?;
+            let survival_10p35 = tpx(&params.mt, 35.0, 10.0, 0.0, None)?;
+            let survival_30p35 = tpx(&params.mt, 35.0, 30.0, 0.0, None)?;
 
             println!("   Life Insurance Values:");
             println!("     Whole life (age 35): {:.6}", whole_life_35);
@@ -136,21 +150,31 @@ fn demo_am92_select() -> Result<(), Box<dyn std::error::Error>> {
                 println!("{}", sample);
             }
 
-            // Perform calculations if it's a proper mortality table
+            // Perform calculations if it's a proper mortality table using struct literal
             if columns.iter().any(|col| col.as_str() == "qx")
                 || columns.iter().any(|col| col.as_str() == "lx")
             {
-                let config = MortTableConfig {
+                let mt_config = MortTableConfig {
                     xml,
                     radix: Some(100_000),
-                    int_rate: Some(0.04),
-                    pct: Some(0.01),
+                    pct: Some(1.0),
                     assumption: Some(AssumptionEnum::UDD),
                 };
 
-                println!("\n🧮 Sample calculations with AM92 data:");
-                let whole_life_40 = Ax(&config, 40, 0, 1, 1, None)?;
-                let survival_20p40 = tpx(&config, 40.0, 20.0, 0.0, None)?;
+                let params = ParamConfig {
+                    mt: mt_config,
+                    i: 0.04,
+                    x: 40,
+                    n: None,
+                    t: None,
+                    m: Some(1),
+                    moment: Some(1),
+                    entry_age: Some(40), // Demo select table usage
+                };
+
+                println!("\n🧮 Sample calculations with AM92 data (struct literal):");
+                let whole_life_40 = Ax(&params)?;
+                let survival_20p40 = tpx(&params.mt, 40.0, 20.0, 0.0, params.entry_age)?;
 
                 println!("   Whole life insurance (age 40): {:.6}", whole_life_40);
                 println!("   20-year survival from age 40: {:.6}", survival_20p40);
@@ -188,33 +212,66 @@ fn demo_ltam_ultimate() -> Result<(), Box<dyn std::error::Error>> {
                 println!("{}", sample);
             }
 
-            // Perform comprehensive calculations
+            // Perform comprehensive calculations using both construction methods
             if columns.iter().any(|col| col.as_str() == "qx")
                 || columns.iter().any(|col| col.as_str() == "lx")
             {
-                let config = MortTableConfig {
+                let mt_config = MortTableConfig {
                     xml,
                     radix: Some(100_000),
-                    int_rate: Some(0.05),
-                    pct: Some(0.01),
+                    pct: Some(1.0),
                     assumption: Some(AssumptionEnum::UDD),
                 };
 
                 println!("\n🧮 Comprehensive calculations with LTAM data:");
 
+                // Create different ParamConfigs for different ages
+                let params_30 = ParamConfig {
+                    mt: mt_config.clone(),
+                    i: 0.05,
+                    x: 30,
+                    n: Some(10),
+                    t: None,
+                    m: Some(1),
+                    moment: Some(1),
+                    entry_age: None,
+                };
+
+                let params_50 = ParamConfig {
+                    mt: mt_config.clone(),
+                    i: 0.05,
+                    x: 50,
+                    n: None,
+                    t: None,
+                    m: Some(1),
+                    moment: Some(1),
+                    entry_age: None,
+                };
+
+                let params_30_annuity = ParamConfig {
+                    mt: mt_config,
+                    i: 0.05,
+                    x: 30,
+                    n: Some(20),
+                    t: None,
+                    m: Some(1),
+                    moment: Some(1),
+                    entry_age: None,
+                };
+
                 // Life insurance calculations
-                let whole_life_30 = Ax(&config, 30, 0, 1, 1, None)?;
-                let whole_life_50 = Ax(&config, 50, 0, 1, 1, None)?;
-                let term_10_age_30 = Ax1n(&config, 30, 10, 0, 1, 1, None)?;
+                let whole_life_30 = Ax(&params_30)?;
+                let whole_life_50 = Ax(&params_50)?;
+                let term_10_age_30 = Ax1n(&params_30)?;
 
                 // Annuity calculations
-                let life_annuity_30 = aax(&config, 30, 0, 1, 1, None)?;
-                let temp_annuity_30_20 = aaxn(&config, 30, 20, 0, 1, 1, None)?;
+                let life_annuity_30 = aax(&params_30)?;
+                let temp_annuity_30_20 = aaxn(&params_30_annuity)?;
 
                 // Survival probabilities
-                let surv_1p30 = tpx(&config, 30.0, 1.0, 0.0, None)?;
-                let surv_10p30 = tpx(&config, 30.0, 10.0, 0.0, None)?;
-                let surv_40p30 = tpx(&config, 30.0, 40.0, 0.0, None)?;
+                let surv_1p30 = tpx(&params_30.mt, 30.0, 1.0, 0.0, None)?;
+                let surv_10p30 = tpx(&params_30.mt, 30.0, 10.0, 0.0, None)?;
+                let surv_40p30 = tpx(&params_30.mt, 30.0, 40.0, 0.0, None)?;
 
                 println!("\n   🏥 Life Insurance Values:");
                 println!("     Whole life at age 30: {:.6}", whole_life_30);
@@ -286,19 +343,29 @@ fn demonstrate_elt15_format() -> Result<(), Box<dyn std::error::Error>> {
     println!("📈 Sample ELT15-style Female mortality data (first 10 rows):");
     println!("{}", df.head(Some(10)));
 
-    // Create MortXML and perform calculations
+    // Create MortXML and perform calculations using struct literals
     let mort_xml = MortXML::from_df(df)?;
-    let config = MortTableConfig {
+    let mt_config = MortTableConfig {
         xml: mort_xml,
         radix: Some(100_000),
-        int_rate: Some(0.03),
-        pct: Some(0.01),
+        pct: Some(1.0),
         assumption: Some(AssumptionEnum::UDD),
     };
 
+    let params = ParamConfig {
+        mt: mt_config,
+        i: 0.03,
+        x: 35,
+        n: None,
+        t: None,
+        m: Some(1),
+        moment: Some(1),
+        entry_age: None,
+    };
+
     println!("\n🧮 Actuarial calculations with sample ELT15-style data:");
-    let whole_life_35 = Ax(&config, 35, 0, 1, 1, None)?;
-    let survival_30p35 = tpx(&config, 35.0, 30.0, 0.0, None)?;
+    let whole_life_35 = Ax(&params)?;
+    let survival_30p35 = tpx(&params.mt, 35.0, 30.0, 0.0, None)?;
 
     println!("   Whole life insurance (age 35): {:.6}", whole_life_35);
     println!(
@@ -378,22 +445,43 @@ fn demonstrate_ltam_format() -> Result<(), Box<dyn std::error::Error>> {
     println!("📈 Sample LTAM-style Ultimate mortality data (first 8 rows):");
     println!("{}", df.head(Some(8)));
 
-    // Perform comprehensive calculations
+    // Perform comprehensive calculations using struct literal
     let mort_xml = MortXML::from_df(df)?;
-    let config = MortTableConfig {
+    let mt_config = MortTableConfig {
         xml: mort_xml,
         radix: Some(100_000),
-        int_rate: Some(0.05),
-        pct: Some(0.01),
+        pct: Some(1.0),
         assumption: Some(AssumptionEnum::UDD),
+    };
+
+    let params_30 = ParamConfig {
+        mt: mt_config.clone(),
+        i: 0.05,
+        x: 30,
+        n: None,
+        t: None,
+        m: Some(1),
+        moment: Some(1),
+        entry_age: None,
+    };
+
+    let params_50 = ParamConfig {
+        mt: mt_config,
+        i: 0.05,
+        x: 50,
+        n: None,
+        t: None,
+        m: Some(1),
+        moment: Some(1),
+        entry_age: None,
     };
 
     println!("\n🧮 Comprehensive calculations with sample LTAM-style data:");
 
-    let whole_life_30 = Ax(&config, 30, 0, 1, 1, None)?;
-    let whole_life_50 = Ax(&config, 50, 0, 1, 1, None)?;
-    let annuity_30 = aax(&config, 30, 0, 1, 1, None)?;
-    let survival_40p30 = tpx(&config, 30.0, 40.0, 0.0, None)?;
+    let whole_life_30 = Ax(&params_30)?;
+    let whole_life_50 = Ax(&params_50)?;
+    let annuity_30 = aax(&params_30)?;
+    let survival_40p30 = tpx(&params_30.mt, 30.0, 40.0, 0.0, None)?;
 
     println!("   🏥 Life Insurance Values:");
     println!("     Whole life at age 30: {:.6}", whole_life_30);

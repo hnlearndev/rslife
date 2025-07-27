@@ -11,11 +11,13 @@ fn test_prelude_imports_basic_types() {
     // Test that we can create the basic configuration enum
     let assumption = AssumptionEnum::UDD;
 
-    // Test that we can reference the MortTableConfig struct
+    // Test that we can reference the MortTableConfig and ParamConfig structs
     let _config_type_name = std::any::type_name::<MortTableConfig>();
+    let _param_type_name = std::any::type_name::<ParamConfig>();
 
     println!("Successfully imported AssumptionEnum: {assumption:?}");
     println!("MortTableConfig type available: {_config_type_name}");
+    println!("ParamConfig type available: {_param_type_name}");
 
     // Verify the enum has the expected variants
     assert!(matches!(assumption, AssumptionEnum::UDD));
@@ -60,12 +62,12 @@ fn test_prelude_imports_xml_types() {
 fn test_prelude_function_accessibility() {
     // Test that actuarial functions are accessible through prelude
     // We test function accessibility without complex type casting
-    
+
     // Verify that our function exports are accessible
     let _ax_fn = Ax;
     let _axn_fn = Axn;
     let _ax1n_fn = Ax1n;
-    let _nex_fn = nEx;
+    let _Exn_fn = Exn;
     let _iax_fn = IAx;
     let _aax_fn = aax;
     let _aaxn_fn = aaxn;
@@ -81,15 +83,26 @@ fn test_prelude_with_real_data() {
     // Test that we can load XML and create config through the prelude
     let xml = MortXML::from_url_id(1704).expect("Failed to load XML from prelude");
 
-    let _config = MortTableConfig {
+    let mt_config = MortTableConfig {
         xml,
         radix: Some(100_000),
         pct: Some(1.0),
-        int_rate: Some(0.03),
         assumption: Some(AssumptionEnum::UDD),
+    };
+
+    let _params = ParamConfig {
+        mt: mt_config,
+        i: 0.03,
+        x: 35,
+        n: Some(10),
+        t: None,
+        m: Some(1),
+        moment: Some(1),
+        entry_age: None,
     };
 
     println!("✓ XML loading works through prelude");
     println!("✓ MortTableConfig creation works through prelude");
+    println!("✓ ParamConfig creation works through prelude");
     println!("✓ All types and functions successfully imported through prelude");
 }
