@@ -229,19 +229,76 @@ let term_life = Ax1n(&ParamConfig::builder()
 
 ### Data Structure Templates
 
-**Ultimate Tables** (single mortality rate per age):
+RSLife supports three primary data structures for mortality tables. Each can use either mortality rates (`qx`) or survivor functions (`lx`).
 
-| Format | age | qx/lx | Example |
-|--------|-----|-------|--------|
-| **Mortality Rates** | 0,1,2,... | 0.006,0.0004,... | `qx` between 0.0-1.0 |
-| **Survivor Function** | 0,1,2,... | 100000,99368,... | `lx` positive numbers |
+#### 1. Ultimate Tables (age + qx)
 
-**Select Tables** (mortality varies by duration since selection):
+Single mortality rate per age - the most common format:
 
-| Format | age | duration | qx/lx | Example |
-|--------|-----|----------|-------|--------|
-| **Mortality Rates** | 25,25,26,... | 1,2,1,... | 0.008,0.009,... | Include `duration` column |
-| **Survivor Function** | 25,25,26,... | 1,2,1,... | 99200,99116,... | Include `duration` column |
+| age | qx      |
+|-----|--------|
+| 25  | 0.00120 |
+| 26  | 0.00135 |
+| 27  | 0.00150 |
+
+```rust
+let df_ultimate = df! {
+    "age" => [25u32, 26, 27, 28, 29],
+    "qx" => [0.00120f64, 0.00135, 0.00150, 0.00168, 0.00188],
+}?;
+```
+
+#### 2. Ultimate Tables (age + lx)
+
+Survivor function format - same data expressed as remaining lives:
+
+| age | lx       |
+|-----|----------|
+| 25  | 100000.0 |
+| 26  | 99880.0  |
+| 27  | 99745.1  |
+| 28  | 99595.4  |
+| 29  | 99428.2  |
+
+```rust
+// Load survivor function data from Excel/LibreOffice Calc file
+let xml_survivors = MortXML::from_xlsx("mortality_lx.xlsx", "survivors")?;
+let mt = MortTableConfig::builder()
+    .xml(xml_survivors)
+    .build()?;
+```
+
+#### 3. Select Tables (age + qx + duration)
+
+Mortality varies by years since policy issue - used for medically underwritten policies:
+
+| age | qx      | duration |
+|-----|---------|----------|
+| 35  | 0.00080 | 1        |
+| 35  | 0.00095 | 2        |
+| 35  | 0.00110 | 3        |
+| 36  | 0.00085 | 1        |
+| 36  | 0.00102 | 2        |
+| 36  | 0.00118 | 3        |
+| 37  | 0.00092 | 1        |
+| 37  | 0.00110 | 2        |
+| 37  | 0.00128 | 3        |
+
+```rust
+// Load select table data from LibreOffice Calc file
+let xml_select = MortXML::from_ods("select_mortality.ods", "select_table")?;
+let mt = MortTableConfig::builder()
+    .xml(xml_select)
+    .radix(100_000)
+    .build()?;
+```
+
+**Key Features:**
+
+- **Automatic Detection**: RSLife automatically detects whether data contains `qx` rates or `lx` survivor functions
+- **Select vs Ultimate**: Presence of `duration` column automatically identifies select tables
+- **Format Flexibility**: All three formats work seamlessly with the same API
+- **Data Validation**: Built-in checks ensure data integrity before calculations
 
 ### Data Validation Rules
 
