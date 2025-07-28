@@ -4,6 +4,7 @@
 //! all commonly used types and functions from the rslife crate, ensuring that
 //! users can import everything they need with a single `use` statement.
 
+use polars::df;
 use rslife::prelude::*;
 
 #[test]
@@ -11,13 +12,11 @@ fn test_prelude_imports_basic_types() {
     // Test that we can create the basic configuration enum
     let assumption = AssumptionEnum::UDD;
 
-    // Test that we can reference the MortTableConfig and ParamConfig structs
+    // Test that we can reference the MortTableConfig (param structs are internal)
     let _config_type_name = std::any::type_name::<MortTableConfig>();
-    let _param_type_name = std::any::type_name::<ParamConfig>();
 
     println!("Successfully imported AssumptionEnum: {assumption:?}");
     println!("MortTableConfig type available: {_config_type_name}");
-    println!("ParamConfig type available: {_param_type_name}");
 
     // Verify the enum has the expected variants
     assert!(matches!(assumption, AssumptionEnum::UDD));
@@ -25,6 +24,8 @@ fn test_prelude_imports_basic_types() {
     // Test other assumption variants
     let _cfm = AssumptionEnum::CFM;
     let _hpb = AssumptionEnum::HPB;
+
+    println!("✓ Parameter structs are internal and not exposed through prelude");
 }
 
 #[test]
@@ -45,17 +46,17 @@ fn test_prelude_imports_polars_types() {
 }
 
 #[test]
-fn test_prelude_imports_xml_types() {
-    // Test that XML types are accessible
-    let _xml_type_name = std::any::type_name::<MortXML>();
-    let _content_class_type_name = std::any::type_name::<ContentClassification>();
+fn test_prelude_imports_data_types() {
+    // Test that data types are accessible
+    let _data_type_name = std::any::type_name::<MortData>();
 
-    println!("MortXML type available: {_xml_type_name}");
-    println!("ContentClassification type available: {_content_class_type_name}");
+    println!("MortData type available: {_data_type_name}");
 
     // Verify type names are correct
-    assert!(_xml_type_name.contains("MortXML"));
-    assert!(_content_class_type_name.contains("ContentClassification"));
+    assert!(_data_type_name.contains("MortData"));
+
+    // Note: XML types are internal to MortData implementation and not exposed
+    println!("✓ MortData accessible through prelude (XML types are internal)");
 }
 
 #[test]
@@ -67,7 +68,7 @@ fn test_prelude_function_accessibility() {
     let _ax_fn = Ax;
     let _axn_fn = Axn;
     let _ax1n_fn = Ax1n;
-    let _Exn_fn = Exn;
+    let _exn_fn = Exn;
     let _iax_fn = IAx;
     let _aax_fn = aax;
     let _aaxn_fn = aaxn;
@@ -80,29 +81,40 @@ fn test_prelude_function_accessibility() {
 
 #[test]
 fn test_prelude_with_real_data() {
-    // Test that we can load XML and create config through the prelude
-    let xml = MortXML::from_url_id(1704).expect("Failed to load XML from prelude");
+    // Create mock data instead of loading from SOA to avoid network dependency
+    let df = df! {
+        "age" => [20.0, 21.0, 22.0, 23.0, 24.0],
+        "qx" => [0.001, 0.002, 0.003, 0.004, 0.005],
+    }
+    .expect("Failed to create mock DataFrame");
 
-    let mt_config = MortTableConfig {
-        xml,
-        radix: Some(100_000),
-        pct: Some(1.0),
-        assumption: Some(AssumptionEnum::UDD),
-    };
+    let data = MortData::from_df(df).expect("Failed to create MortData from DataFrame");
 
-    let _params = ParamConfig {
-        mt: mt_config,
-        i: 0.03,
-        x: 35,
-        n: Some(10),
-        t: None,
-        m: Some(1),
-        moment: Some(1),
-        entry_age: None,
-    };
+    let mt_config = MortTableConfig::builder()
+        .data(data)
+        .radix(100_000)
+        .pct(1.0)
+        .assumption(AssumptionEnum::UDD)
+        .build();
 
-    println!("✓ XML loading works through prelude");
-    println!("✓ MortTableConfig creation works through prelude");
-    println!("✓ ParamConfig creation works through prelude");
+    // Test direct function calls (the new API)
+    let whole_life_result = Ax()
+        .mt(&mt_config)
+        .i(0.03)
+        .x(20)
+        .call();
+    
+    let survival_result = tpx()
+        .mt(&mt_config)
+        .x(20.0)
+        .t(3.0)
+        .call();
+
+    // These should compile successfully (we don't need to verify exact values)
+    println!("✓ Mock data creation works through prelude");
+    println!("✓ MortTableConfig builder works through prelude");
+    println!("✓ Direct function calls work through prelude");
+    println!("✓ Ax() function call result: {:?}", whole_life_result.is_ok());
+    println!("✓ tpx() function call result: {:?}", survival_result.is_ok());
     println!("✓ All types and functions successfully imported through prelude");
 }

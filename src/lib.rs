@@ -6,8 +6,8 @@
 //! ## Features
 //!
 //! - **🚀 High Performance**: Optimized calculations with intelligent memory management
-//! - **🔒 Type Safety**: Uses `u32` for age/duration columns (prevents negative values)
-//! - **📊 Smart XML Parsing**: Loads mortality data from SOA XTbML standard with automatic `tqx`/`lx` detection
+//! - **🔒 Type Safety**: Uses `f64` for age/duration columns (supports fractional values)
+//! - **📊 Smart Data Loading**: Loads mortality data from SOA XTbML standard, XLSX files, or DataFrames with automatic `tqx`/`lx` detection
 //! - **✅ Parameter Validation**: Automatic cross-field validation prevents calculation errors
 //! - **🧮 Comprehensive Coverage**: Life insurance, annuities, and survival functions with standard actuarial notation
 //! - **📈 Multiple Assumptions**: UDD, CFM, and HPB methods for fractional age calculations
@@ -15,43 +15,47 @@
 //!
 //! ## Architecture Overview
 //!
-//! RSLife uses a two-tier configuration system:
+//! RSLife provides direct function calls with automatic parameter validation:
 //!
-//! 1. **`MortTableConfig`**: Configures mortality table settings (data source, radix, percentage adjustments, assumptions)
-//! 2. **`ParamConfig`**: Contains all calculation parameters including the mortality table config, interest rates, ages, terms, and validation
+//! 1. **`MortTableConfig`**: Configures mortality table settings using builder pattern with `data` field
+//! 2. **Direct Function Calls**: All actuarial functions like `Ax()`, `aaxn()`, `tpx()` are called directly with parameters
+//! 3. **Internal Validation**: Parameter validation happens automatically within each function
 //!
-//! This design ensures type safety, prevents parameter mismatches, and enables comprehensive validation before calculations
+//! This design ensures type safety, prevents parameter mismatches, and provides a clean API for calculations
 //!
 //! ## Quick Start
 //!
 //! ```rust
 //! use rslife::prelude::*;
 //!
-//! // Load SOA mortality table
-//! let xml = MortXML::from_url_id(1704)?;
-//! let mt_config = MortTableConfig {
-//!     xml,
-//!     radix: Some(100_000),
-//!     pct: Some(1.0),
-//!     assumption: Some(AssumptionEnum::UDD),
-//! };
+//! // Load SOA mortality table using MortData
+//! let data = MortData::from_soa_url(1704)?;
+//! let mt_config = MortTableConfig::builder()
+//!     .data(data)
+//!     .radix(100_000)
+//!     .pct(1.0)
+//!     .assumption(AssumptionEnum::UDD)
+//!     .build()?;
 //!
-//! let params = ParamConfig {
-//!     mt: mt_config,
-//!     i: 0.03,
-//!     x: 35,
-//!     n: None,
-//!     t: Some(0),
-//!     m: Some(1),
-//!     moment: Some(1),
-//!     entry_age: None,
-//! };
+//! // Calculate actuarial values using direct function calls
+//! let whole_life = Ax()
+//!     .mt(&mt_config)
+//!     .i(0.03)
+//!     .x(35)
+//!     .call()?;
 //!
-//! // Calculate actuarial values
+//! let annuity = aaxn()
+//!     .mt(&mt_config)
+//!     .i(0.03)
+//!     .x(35)
+//!     .n(10)
+//!     .call()?;
 //!
-//! let whole_life = Ax(&params)?;
-//! let annuity = aaxn(&params)?;
-//! let survival = tpx(&params.mt, 30.0, 5.0, 0.0, None)?;
+//! let survival = tpx()
+//!     .mt(&mt_config)
+//!     .x(30.0)
+//!     .t(5.0)
+//!     .call()?;
 //!
 //! println!("Whole life: {:.6}", whole_life);
 //! println!("Annuity: {:.6}", annuity);
@@ -65,103 +69,119 @@
 //! use rslife::prelude::*;
 //! use polars::prelude::*;
 //!
-//! // Create mortality table with u32 age columns (type-safe, no negative ages)
+//! // Create mortality table with f64 age columns (supports fractional ages)
 //! let df = df! {
-//!     "age" => [25u32, 26, 27, 28, 29],
+//!     "age" => [25.0f64, 26.0, 27.0, 28.0, 29.0],
 //!     "qx" => [0.001f64, 0.002, 0.003, 0.004, 0.005],
 //! }?;
 //!
-//! let xml = MortXML::from_df(df)?;
-//! let mt_config = MortTableConfig {
-//!     xml,
-//!     radix: Some(100_000),
-//!     pct: Some(1.0),
-//!     assumption: Some(AssumptionEnum::UDD),
-//! };
-//!
-//! let params = ParamConfig {
-//!     mt: mt_config,
-//!     i: 0.05,
-//!     x: 25,
-//!     n: Some(10),
-//!     t: None,
-//!     m: Some(1),
-//!     moment: Some(1),
-//!     entry_age: None,
-//! };
+//! let data = MortData::from_dataframe(df)?;
+//! let mt_config = MortTableConfig::builder()
+//!     .data(data)
+//!     .radix(100_000)
+//!     .pct(1.0)
+//!     .assumption(AssumptionEnum::UDD)
+//!     .build()?;
 //!
 //! // Custom table is ready for actuarial calculations
-//! let term_insurance = Ax1n(&params)?;
-//! println!("Custom table has {} rows", params.mt.xml.tables[0].values.height());
+//! let term_insurance = Ax1n()
+//!     .mt(&mt_config)
+//!     .i(0.05)
+//!     .x(25)
+//!     .n(10)
+//!     .call()?;
+//!
+//! println!("Custom table has {} rows", mt_config.data.tables[0].values.height());
 //! println!("10-year term insurance at age 25: {:.6}", term_insurance);
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
 //! ## Data Structure
 //!
-//! - Age and duration columns use `u32` for type safety (prevents negative values)
-//! - [`MortXML`] struct: parses and holds mortality table(s) from XML or DataFrame
-//! - [`MortTableConfig`] struct: configures mortality table settings (radix, percentage, assumption)
-//! - [`ParamConfig`] struct: contains all parameters for actuarial calculations including mortality table config, interest rate, ages, terms, and other calculation parameters
+//! - Age and duration columns use `f64` for flexibility (supports fractional values)
+//! - [`MortData`] struct: loads and holds mortality table(s) from SOA URL, XLSX files, or DataFrames
+//! - [`MortTableConfig`] struct: configures mortality table settings using builder pattern with `data` field
+//! - Direct function calls: `Ax()`, `aaxn()`, `tpx()`, etc. with automatic parameter validation
 //!
 //! ## Actuarial Functions
 //!
-//! Most functions use `ParamConfig` which contains all required parameters and performs automatic validation.
+//! All functions use direct function calls with automatic parameter validation.
 //! Functions support both regular mortality and select-ultimate tables via the optional `entry_age` parameter.
 //!
+//! ### Function Call Pattern
+//!
+//! Each function uses a builder pattern for parameters, then `.call()` to execute:
+//!
+//! ```rust
+//! let result = Ax()  // function name
+//!     .mt(&mt_config)  // mortality table config
+//!     .i(0.03)         // interest rate
+//!     .x(35)           // age
+//!     .t(Some(0))      // optional deferral
+//!     .call()?;        // execute with validation
+//! ```
+//!
 //! ### Life Insurance Benefits
-//! - `Ax(params: &ParamConfig) -> Result<f64>` - Whole life insurance
-//! - `Ax1n(params: &ParamConfig) -> Result<f64>` - Term life insurance
-//! - `Exn(params: &ParamConfig) -> Result<f64>` - Pure endowment
-//! - `Axn(params: &ParamConfig) -> Result<f64>` - Endowment insurance
+//! - `Ax().call()` - Whole life insurance
+//! - `Ax1n().call()` - Term life insurance (requires `.n()`)
+//! - `Exn().call()` - Pure endowment (requires `.n()`)
+//! - `Axn().call()` - Endowment insurance (requires `.n()`)
 //!
 //! ### Increasing Benefit Insurance
-//! - `IAx(params: &ParamConfig) -> Result<f64>` - Increasing whole life insurance
-//! - `IAx1n(params: &ParamConfig) -> Result<f64>` - Increasing term life insurance
-//! - `IAxn(params: &ParamConfig) -> Result<f64>` - Increasing endowment insurance
+//! - `IAx().call()` - Increasing whole life insurance
+//! - `IAx1n().call()` - Increasing term life insurance
+//! - `IAxn().call()` - Increasing endowment insurance
 //!
 //! ### Decreasing Benefit Insurance
-//! - `DAx1n(params: &ParamConfig) -> Result<f64>` - Decreasing term life insurance
-//! - `DAxn(params: &ParamConfig) -> Result<f64>` - Decreasing endowment insurance
+//! - `DAx1n().call()` - Decreasing term life insurance
+//! - `DAxn().call()` - Decreasing endowment insurance
 //!
 //! ### Geometric Increasing Benefits
-//! - `gAx(params: &ParamConfig) -> Result<f64>` - Geometric whole life insurance (requires growth rate)
-//! - `gAx1n(params: &ParamConfig) -> Result<f64>` - Geometric term life insurance
-//! - `gExn(params: &ParamConfig) -> Result<f64>` - Geometric pure endowment
-//! - `gAxn(params: &ParamConfig) -> Result<f64>` - Geometric endowment insurance
+//! - `gAx().call()` - Geometric whole life insurance
+//! - `gAx1n().call()` - Geometric term life insurance
+//! - `gExn().call()` - Geometric pure endowment
+//! - `gAxn().call()` - Geometric endowment insurance
 //!
 //! ### Annuities
-//! - `aax(params: &ParamConfig) -> Result<f64>` - Life annuity-due
-//! - `aaxn(params: &ParamConfig) -> Result<f64>` - Temporary annuity-due
+//! - `aax().call()` - Life annuity-due
+//! - `aaxn().call()` - Temporary annuity-due (requires `.n()`)
 //!
 //! ### Increasing Annuities
-//! - `Iaax(params: &ParamConfig) -> Result<f64>` - Increasing life annuity-due
-//! - `Iaaxn(params: &ParamConfig) -> Result<f64>` - Increasing temporary annuity-due
+//! - `Iaax().call()` - Increasing life annuity-due
+//! - `Iaaxn().call()` - Increasing temporary annuity-due
 //!
 //! ### Decreasing Annuities
-//! - `Daaxn(params: &ParamConfig) -> Result<f64>` - Decreasing temporary annuity-due
+//! - `Daaxn().call()` - Decreasing temporary annuity-due
 //!
 //! ### Geometric Increasing Annuities
-//! - `gaax(params: &ParamConfig) -> Result<f64>` - Geometric life annuity-due (requires growth rate)
-//! - `gaaxn(params: &ParamConfig) -> Result<f64>` - Geometric temporary annuity-due
+//! - `gaax().call()` - Geometric life annuity-due
+//! - `gaaxn().call()` - Geometric temporary annuity-due
 //!
-//! ### Fractional Age Functions
-//! - `tpx(config: &MortTableConfig, x: f64, t: f64, s: f64, entry_age: Option<u32>) -> Result<f64>` - Survival probability
-//! - `tqx(config: &MortTableConfig, x: f64, t: f64, s: f64, entry_age: Option<u32>) -> Result<f64>` - Death probability
+//! ### Survival Functions
+//!
+//! ```rust
+//! let survival = tpx()
+//!     .mt(&mt_config)
+//!     .x(30.0)  // age (f64 for fractional)
+//!     .t(5.0)   // time (f64 for fractional)
+//!     .call()?;
+//! ```
+//!
+//! - `tpx().call()` - Survival probability
+//! - `tqx().call()` - Death probability
 //!
 //! **Notes:**
-//! - All functions follow standard actuarial notation and use `ParamConfig` for parameters
-//! - `ParamConfig` contains: mortality table config (`mt`), interest rate (`i`), age (`x`), term (`n`), deferral (`t`), payment frequency (`m`), moment, and entry age
-//! - Set `entry_age = None` for regular mortality tables, or `Some(age)` for select-ultimate tables
-//! - Fractional functions (`tpx`, `tqx`) take `MortTableConfig` directly and accept `f64` for age and time parameters
-//! - All other functions use `ParamConfig` and perform automatic parameter validation
+//! - All functions follow standard actuarial notation
+//! - Common builder methods: `.mt()`, `.i()`, `.x()`, `.n()`, `.t()`, `.m()`, `.moment()`, `.entry_age()`
+//! - Survival functions accept `f64` for age and time parameters for fractional calculations
+//! - All calculations include automatic parameter validation before execution
 
-pub mod annuities;
 pub mod annuities_certain;
-pub mod benefits;
+pub mod helpers;
 pub mod int_rate_convert;
 pub mod mt_config;
-pub mod param_config;
+pub mod mt_data;
+pub mod params;
 pub mod prelude;
-pub mod survivals;
+pub mod single;
 pub mod xml;

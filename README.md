@@ -10,8 +10,8 @@ A comprehensive Rust library for actuarial mortality table calculations and life
 
 **🚀 Performance & Memory Efficiency:**
 - Built on Rust's zero-cost abstractions for maximum performance
-- Polars integration for efficient DataFrame operations
-- Minimal memory allocation with smart data reuse
+- Polars integration for efficient DataFrame operations with zero-copy optimization
+- Minimal memory allocation with smart data reuse and lazy evaluation
 - Compile-time optimizations eliminate runtime overhead
 
 **🎯 Developer Experience:**
@@ -19,18 +19,20 @@ A comprehensive Rust library for actuarial mortality table calculations and life
 - **Type Safety**: Compile-time validation prevents common actuarial calculation errors
 - **Auto-Completion**: IDEs provide intelligent suggestions for all parameters
 - **Self-Documenting**: Parameter names make code intent crystal clear
+- **Cross-Field Validation**: Parameter combinations validated automatically
 
-**📊 Data Flexibility:**
+**📊 Intelligent Data Processing:**
 - **Universal Input**: DataFrames, XLSX/ODS files, and SOA XML with automatic format detection
-- **Format Agnostic**: Works with `qx` rates or `lx` survivor functions seamlessly
-- **Validation Built-In**: Comprehensive data integrity checks before calculations
+- **Format Agnostic**: Seamlessly detects `qx` rates or `lx` survivor functions without manual specification
+- **Smart Table Recognition**: Automatically determines ultimate vs select mortality tables
+- **Validation Built-In**: Comprehensive data integrity checks prevent runtime errors before calculations
 - **Select & Ultimate**: Full support for both table types with automatic recognition
 
 **🔧 Production Ready:**
 - **Complete Actuarial Coverage**: Life insurance, annuities, and survival functions with standard notation
 - **Multiple Assumptions**: UDD, CFM, and HPB methods for fractional age calculations
-- **Consistent API**: All functions use the same parameter structure
-- **Extensible**: Easy to add new parameters without breaking existing code
+- **Consistent API**: All functions use the same parameter structure with builder pattern
+- **Battle-Tested**: Validated against standard actuarial references and SOA mortality tables
 - **Error Handling**: Clear, actionable error messages for debugging
 
 ## Quick Start
@@ -47,12 +49,13 @@ rslife = "0.1.3"
 ```rust
 use rslife::prelude::*;
 
-fn main() - Result(), Boxdyn std::error::Error {
-    let xml = MortXML::from_url_id(1704)?;
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Load mortality data from SOA (Society of Actuaries)
+    let data = MortData::from_soa_url_id(1704)?;
 
     // Method 1: Struct literal (specify all fields)
     let mt = MortTableConfig {
-        xml: xml.clone(),
+        data: data.clone(),
         radix: Some(100_000),
         pct: Some(1.0),
         assumption: Some(AssumptionEnum::UDD),
@@ -60,26 +63,26 @@ fn main() - Result(), Boxdyn std::error::Error {
 
     // Method 2: Builder pattern (only specify needed fields)
     let mt_builder = MortTableConfig::builder()
-        .xml(xml)
+        .data(data)
         .radix(100_000)
         .pct(1.0)
         .assumption(AssumptionEnum::UDD)
         .build()?;
 
-    // Builder pattern works for both configs!
-    let life_annuity = aax(ParamConfig::builder()
-        .mt(mt.clone())  // or mt_builder.clone()
+    // New builder pattern for actuarial calculations!
+    let life_annuity = aax()
+        .mt(&mt)  // or &mt_builder
         .i(0.03)
         .x(65)
-        .build())?;
+        .call()?;
 
-    let deferred_term = Ax1n(ParamConfig::builder()
-        .mt(mt_builder)
+    let deferred_term = Ax1n()
+        .mt(&mt_builder)
         .i(0.03)
         .x(35)
         .n(15)
         .t(5)
-        .build())?;
+        .call()?;
 
     let results = [
         ("Life Annuity", life_annuity),
@@ -90,8 +93,15 @@ fn main() - Result(), Boxdyn std::error::Error {
         println!("{}: {:.6}", name, value);
     }
 
-    // Survival probabilities
-    println!("5-year survival from age 35: {:.4}", tpx(&mt, 35.0, 5.0, 0.0, None)?);
+    // Survival probabilities with new builder pattern
+    let survival_5_years = tpx()
+        .mt(&mt)
+        .x(35.0)
+        .t(5.0)
+        .k(0.0)
+        .call()?;
+
+    println!("5-year survival from age 35: {:.4}", survival_5_years);
     Ok(())
 }
 ```
@@ -114,11 +124,11 @@ let params = ComplexConfig {
 let result = some_function(&config, 35, 0.03, 1, 0, None, None, 1)?; // What does this mean?
 
 // ✅ RSLife: crystal clear, only specify what matters
-let result = Ax(&ParamConfig::builder()
-    .mt(config)
+let result = Ax()
+    .mt(&config)
     .i(0.03)
     .x(35)
-    .build())?;
+    .call()?;
 ```
 
 ### Custom Data Sources
@@ -131,44 +141,42 @@ use rslife::prelude::*;
 
 // DataFrames - mortality rates or survivor functions
 let df_qx = df! {
-    "age" = [25u32, 26, 27],
-    "qx" = [0.001f64, 0.0012, 0.0015],
+    "age" => [25.0, 26.0, 27.0],
+    "qx" => [0.001, 0.0012, 0.0015],
 }?;
 
 let df_lx = df! {
-    "age" = [25u32, 26, 27],
-    "lx" = [100000.0f64, 99900.0, 99780.0],
+    "age" => [25.0, 26.0, 27.0],
+    "lx" => [100000.0, 99900.0, 99780.0],
 }?;
 
-// XLSX/ODS files - Excel or LibreOffice Calc
-let xml_xlsx = MortXML::from_xlsx("data/mortality.xlsx", "ultimate")?;
-let xml_ods = MortXML::from_ods("data/mortality.ods", "select")?;
-
-// SOA XML - Official mortality tables
-let xml_soa = MortXML::from_url_id(1704)?; // 2017 CSO table
+// Load data from various sources
+let data_from_df = MortData::from_df(df_qx.clone())?;
+let data_from_file = MortData::from_ods("data/mortality.ods", "select")?;
+let data_from_soa = MortData::from_soa_url_id(1704)?; // 2017 CSO table
 
 // Both patterns work seamlessly with any data source
 
 // Option A: Struct literal
 let mt_struct = MortTableConfig {
-    xml: MortXML::from_df(df_qx.clone())?,
+    data: data_from_df,
     radix: Some(100_000),
     pct: Some(1.0),
     assumption: Some(AssumptionEnum::UDD),
 };
 
-// Option B: Builder pattern - Shoerter form because
-// UDD for fractional, radix are not neceesary
-// pct will be default to 1.0 so we do not need to setup.
+// Option B: Builder pattern - shorter form with defaults
+// UDD assumption, 100k radix, and 1.0 pct are defaults
 let mt_builder = MortTableConfig::builder()
-    .xml(MortXML::from_df(df_qx)?)
+    .data(data_from_soa)
     .build()?;
 
-let result = Ax(ParamConfig::builder()
-    .mt(mt_builder)  // or mt_struct
+// New actuarial function builder pattern
+let result = Ax()
+    .mt(&mt_builder)  // or &mt_struct
     .i(0.05)
     .x(25)
-    .build())?;
+    .call()?;
 ```
 
 ## Why the Builder Pattern is Superior
@@ -192,18 +200,18 @@ whole_life = LifeInsurance(
 )  # What do these parameters mean?
 
 // ✅ RSLife's builder pattern
-let whole_life = Ax(&ParamConfig::builder()
-    .mt(config)
+let whole_life = Ax()
+    .mt(&config)
     .i(0.03)
     .x(35)
-    .build())?;
+    .call()?;
 
-let term_life = Ax1n(&ParamConfig::builder()
-    .mt(config)
+let term_life = Ax1n()
+    .mt(&config)
     .i(0.03)
     .x(35)
     .n(20)
-    .build())?;
+    .call()?;
 ```
 
 **Builder Pattern Advantages:**
@@ -214,15 +222,18 @@ let term_life = Ax1n(&ParamConfig::builder()
 - **⚡ Efficient**: Automatic cross-field validation catches errors early
 
 **Architecture Overview:**
+
 - **`MortTableConfig`**: Mortality table settings (data source, assumptions, adjustments)
-- **`ParamConfig`**: Calculation parameters with automatic validation
-- **Functions**: Standard actuarial notation (`Ax`, `aax`, `tpx`, etc.)
+- **`SingleLifeParams`**: Single life calculation parameters with automatic validation
+- **`SurvivalFunctionParams`**: Survival function parameters with automatic validation
+- **Functions**: Standard actuarial notation (`Ax`, `aax`, `tpx`, etc.) with builder pattern
 
 ## Data Format Requirements
 
 ### Supported Input Formats
 
 **Data Sources:**
+
 - **DataFrames**: Polars DataFrames with `qx` (rates 0.0-1.0) or `lx` (survivors from 100,000)
 - **XLSX/ODS**: Excel or LibreOffice Calc spreadsheet files
 - **SOA XML**: Direct access to Society of Actuaries mortality tables
@@ -262,9 +273,9 @@ Survivor function format - same data expressed as remaining lives:
 
 ```rust
 // Load survivor function data from Excel/LibreOffice Calc file
-let xml_survivors = MortXML::from_xlsx("mortality_lx.xlsx", "survivors")?;
+let data_survivors = MortData::from_xlsx("mortality_lx.xlsx", "survivors")?;
 let mt = MortTableConfig::builder()
-    .xml(xml_survivors)
+    .data(data_survivors)
     .build()?;
 ```
 
@@ -280,15 +291,12 @@ Mortality varies by years since policy issue - used for medically underwritten p
 | 36  | 0.00085 | 1        |
 | 36  | 0.00102 | 2        |
 | 36  | 0.00118 | 3        |
-| 37  | 0.00092 | 1        |
-| 37  | 0.00110 | 2        |
-| 37  | 0.00128 | 3        |
 
 ```rust
 // Load select table data from LibreOffice Calc file
-let xml_select = MortXML::from_ods("select_mortality.ods", "select_table")?;
+let data_select = MortData::from_ods("select_mortality.ods", "select_table")?;
 let mt = MortTableConfig::builder()
-    .xml(xml_select)
+    .data(data_select)
     .radix(100_000)
     .build()?;
 ```
@@ -313,32 +321,32 @@ let mt = MortTableConfig::builder()
 use polars::prelude::*;
 use rslife::prelude::*;
 
-fn main() - Result(), Boxdyn std::error::Error {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Method 1: DataFrame with mortality rates
     let df = df! {
-        "age" = [25u32, 26, 27, 28],
-        "qx" = [0.001f64, 0.0012, 0.0015, 0.0018],
+        "age" => [25.0, 26.0, 27.0, 28.0],
+        "qx" => [0.001, 0.0012, 0.0015, 0.0018],
     }?;
 
     // Method 2: XLSX file (same format as above table)
-    let xml_file = MortXML::from_xlsx("mortality.xlsx", "sheet1")?;
+    let data_file = MortData::from_xlsx("mortality.xlsx", "sheet1")?;
 
     // Method 3: Official SOA mortality table
-    let xml_soa = MortXML::from_url_id(1704)?; // 2017 CSO
+    let data_soa = MortData::from_soa_url_id(1704)?; // 2017 CSO
 
     let mt = MortTableConfig {
-        xml: MortXML::from_df(df)?,  // Use any of the three methods
+        data: MortData::from_df(df)?,  // Use any of the three methods
         radix: Some(100_000),
         pct: Some(1.0),
         assumption: Some(AssumptionEnum::UDD),
     };
 
-    // Builder pattern works with any data source
-    let insurance = Ax(ParamConfig::builder()
-        .mt(mt)
+    // New builder pattern for actuarial calculations
+    let insurance = Ax()
+        .mt(&mt)
         .i(0.03)
         .x(25)
-        .build())?;
+        .call()?;
 
     println!("Whole life insurance value: {:.6}", insurance);
     Ok(())
@@ -348,22 +356,6 @@ fn main() - Result(), Boxdyn std::error::Error {
 > **💡 Spreadsheet Tips:**
 > Use first row for headers • No empty cells in data range • Ages as integers • Mortality rates as decimals • Save as `.xlsx` or `.ods`
 
-## Core Features & Performance
-
-### Intelligent Data Processing
-
-- **🔍 Automatic Detection**: Seamlessly detects `qx` (mortality rates) or `lx` (survivor functions) format without manual specification
-- **📊 Smart Table Recognition**: Automatically determines ultimate vs select mortality tables based on column structure
-- **⚡ Zero-Copy Optimization**: Efficient data processing with minimal memory overhead using Polars DataFrames
-- **🛡️ Pre-Calculation Validation**: Comprehensive data integrity checks prevent runtime errors before calculations begin
-- **🎯 Lazy Evaluation**: Only computes necessary mortality table components for your specific calculations
-
-### Built-in Safety & Reliability
-
-- **🔒 Type Safety**: `u32` for ages prevents negative values and floating-point errors
-- **✅ Cross-Field Validation**: Parameter combinations are validated automatically (e.g., term length vs age ranges)
-- **📋 Comprehensive Error Handling**: Clear, actionable error messages for data format issues
-- **🧪 Battle-Tested**: Validated against standard actuarial references and SOA mortality tables
 
 ## Mortality Assumptions
 
@@ -407,7 +399,7 @@ Hyperbolic interpolation:
 
 These modifiers are applicable to most but not all functions.
 
-All functions now use `ParamConfig` for consistent parameter passing and automatic validation.
+All functions now use the builder pattern with `SingleLifeParams` and `SurvivalFunctionParams` for consistent parameter passing and automatic validation.
 
 ### Full list of actuarial functions available via `rslife::prelude::*`
 
@@ -424,10 +416,10 @@ All functions now use `ParamConfig` for consistent parameter passing and automat
 
 **Benefits and Life Insurance:**
 
-- `Ax`, `Ax1n`, `nEx`, `Axn`
+- `Ax`, `Ax1n`, `Exn`, `Axn`
 - `IAx`, `IAx1n`, `IAxn`
 - `DAx1n`, `DAxn`
-- `gAx`, `gAx1n`, `gnEx`, `gAxn`
+- `gAx`, `gAx1n`, `gExn`, `gAxn`
 
 **Survival Probabilities:**
 
@@ -439,7 +431,7 @@ For more details, please visit the [full documentation](https://docs.rs/rslife)
 
 Check out the `examples/` directory for comprehensive examples:
 
-- **`basic_usage.rs`** - Demonstrates both UDD and CFM mortality assumptions with ParamConfig
+- **`basic_usage.rs`** - Demonstrates both UDD and CFM mortality assumptions with builder pattern
 - **`soa_data_demo.rs`** - Loading real SOA mortality tables (2017 CSO, 1980 CSO) with calculations
 - **`custom_data_demo.rs`** - Working with XLSX files and custom DataFrames, including fallback examples
 
@@ -448,12 +440,6 @@ Check out the `examples/` directory for comprehensive examples:
 ```bash
 # Basic usage example
 cargo run --example basic_usage
-
-# SOA data demonstration
-cargo run --example soa_data_demo
-
-# Custom data sources
-cargo run --example custom_data_demo
 ```
 
 ### Key Features Demonstrated
@@ -463,7 +449,6 @@ cargo run --example custom_data_demo
 - **Mortality assumptions** (UDD vs CFM comparisons)
 - **Select vs ultimate** mortality tables
 - **Comprehensive calculations** (life insurance, annuities, survival probabilities)
-
 
 ## Contributing
 

@@ -41,9 +41,14 @@
 
 #![allow(non_snake_case)] // Allow actuarial notation (gen_Ax_IAx, etc.)
 
-use crate::xml::MortXML;
+use crate::mt_data::MortData;
 use bon::Builder;
 use garde::Validate;
+
+// ===============================================
+// MORTALITY ASSUMPTIONS
+// ===============================================
+
 /// Mortality assumptions for fractional age calculations.
 ///
 /// Determines how mortality is distributed within age intervals, affecting
@@ -64,6 +69,10 @@ pub enum AssumptionEnum {
     HPB,
 }
 
+// ===============================================
+// MORTALITY ASSUMPTIONS
+// ===============================================
+
 /// Configuration for generating mortality tables with demographic and actuarial functions.
 ///
 /// Generates mortality tables from XML data with configurable detail levels, from basic
@@ -74,7 +83,7 @@ pub enum AssumptionEnum {
 #[garde(allow_unvalidated)]
 pub struct MortTableConfig {
     /// Source mortality data (must contain exactly one age-based table).
-    pub xml: MortXML,
+    pub data: MortData,
 
     /// Initial population size (radix). Common values: 100,000 (standard), 1,000,000 (precise).
     #[garde(range(min = 1))]
@@ -102,38 +111,64 @@ fn validate_pct(value: &Option<f64>, _context: &()) -> garde::Result {
 }
 
 impl MortTableConfig {
-    pub fn min_age(&self) -> u32 {
-        // Get the first table's age column and find the minimum age
-        if let Some(table) = self.xml.tables.first() {
-            if let Ok(age_column) = table.values.column("age") {
-                if let Ok(Some(min_val)) = age_column.as_materialized_series().min::<u32>() {
+    pub fn min_age(&self) -> f64 {
+        // Get the minimum age from the dataframe
+        if let Ok(age_column) = self.data.dataframe.column("age") {
+            if let Ok(age_series) = age_column.f64() {
+                if let Some(min_val) = age_series.iter().flatten().min_by(|a, b| a.partial_cmp(b).unwrap()) {
                     return min_val;
                 }
             }
         }
         // Default to 0 if no age data is available
-        0
+        0.0
     }
 
-    pub fn max_age(&self) -> u32 {
-        // Get the first table's age column and find the maximum age
-        if let Some(table) = self.xml.tables.first() {
-            if let Ok(age_column) = table.values.column("age") {
-                if let Ok(Some(max_val)) = age_column.as_materialized_series().max::<u32>() {
+    pub fn max_age(&self) -> f64 {
+        // Get the maximum age from the dataframe
+        if let Ok(age_column) = self.data.dataframe.column("age") {
+            if let Ok(age_series) = age_column.f64() {
+                if let Some(max_val) = age_series.iter().flatten().max_by(|a, b| a.partial_cmp(b).unwrap()) {
                     return max_val;
                 }
             }
         }
         // Default to 0 if no age data is available
-        0
+        0.0
+    }
+
+    pub fn min_duration(&self) -> f64 {
+        // Get the minimum duration from the dataframe (if duration column exists)
+        if let Ok(duration_column) = self.data.dataframe.column("duration") {
+            if let Ok(duration_series) = duration_column.f64() {
+                if let Some(min_val) = duration_series.iter().flatten().min_by(|a, b| a.partial_cmp(b).unwrap()) {
+                    return min_val;
+                }
+            }
+        }
+        // Default to 0 if no duration data is available
+        0.0
+    }
+
+    pub fn max_duration(&self) -> f64 {
+        // Get the maximum duration from the dataframe (if duration column exists)
+        if let Ok(duration_column) = self.data.dataframe.column("duration") {
+            if let Ok(duration_series) = duration_column.f64() {
+                if let Some(max_val) = duration_series.iter().flatten().max_by(|a, b| a.partial_cmp(b).unwrap()) {
+                    return max_val;
+                }
+            }
+        }
+        // Default to 0 if no duration data is available
+        0.0
     }
 }
 
-// Default apply no interest rate, no radix, 100% mortality rates UDD assumption.
+// Provide defaults for all fields except `data`, which must be set manually.
 impl Default for MortTableConfig {
     fn default() -> Self {
         MortTableConfig {
-            xml: MortXML::default(),
+            data: MortData::default(),
             radix: Some(100_000),
             pct: Some(1.0),
             assumption: Some(AssumptionEnum::UDD),
@@ -151,7 +186,7 @@ mod tests {
     #[test]
     fn test_pct_validation_valid_none() {
         let config = MortTableConfig {
-            xml: MortXML::default(),
+            data: MortData::default(),
             radix: None,
             pct: None, // Valid: None is allowed
             assumption: None,
@@ -166,7 +201,7 @@ mod tests {
 
         for pct_val in valid_pcts {
             let config = MortTableConfig {
-                xml: MortXML::default(),
+                data: MortData::default(),
                 radix: None,
                 pct: Some(pct_val), // Valid: > 0.0
                 assumption: None,
@@ -179,7 +214,7 @@ mod tests {
     #[test]
     fn test_pct_validation_invalid_zero() {
         let config = MortTableConfig {
-            xml: MortXML::default(),
+            data: MortData::default(),
             radix: None,
             pct: Some(0.0), // Invalid: cannot be 0.0
             assumption: None,
@@ -198,7 +233,7 @@ mod tests {
 
         for pct_val in negative_pcts {
             let config = MortTableConfig {
-                xml: MortXML::default(),
+                data: MortData::default(),
                 radix: None,
                 pct: Some(pct_val), // Negative values are allowed (might represent special cases)
                 assumption: None,
@@ -217,7 +252,7 @@ mod tests {
     fn test_radix_validation_with_pct() {
         // Test that radix validation still works alongside pct validation
         let config_invalid_radix = MortTableConfig {
-            xml: MortXML::default(),
+            data: MortData::default(),
             radix: Some(0), // Invalid: < 1
             pct: Some(0.5), // Valid
             assumption: None,
@@ -230,7 +265,7 @@ mod tests {
     #[test]
     fn test_multiple_validation_errors() {
         let config = MortTableConfig {
-            xml: MortXML::default(),
+            data: MortData::default(),
             radix: Some(0), // Invalid: < 1 (built-in validation)
             pct: Some(0.0), // Invalid: cannot be 0.0 (custom validation)
             assumption: None,
@@ -255,7 +290,7 @@ mod tests {
     fn test_realistic_mortality_scenarios() {
         // Scenario 1: Standard mortality table
         let standard = MortTableConfig {
-            xml: MortXML::default(),
+            data: MortData::default(),
             radix: Some(100_000),
             pct: Some(1.0), // 100% of standard rates
             assumption: Some(AssumptionEnum::UDD),
@@ -264,7 +299,7 @@ mod tests {
 
         // Scenario 2: Preferred rates (reduced mortality)
         let preferred = MortTableConfig {
-            xml: MortXML::default(),
+            data: MortData::default(),
             radix: Some(100_000),
             pct: Some(0.75), // 75% of standard rates
             assumption: Some(AssumptionEnum::CFM),
@@ -273,7 +308,7 @@ mod tests {
 
         // Scenario 3: Substandard rates (increased mortality)
         let substandard = MortTableConfig {
-            xml: MortXML::default(),
+            data: MortData::default(),
             radix: Some(50_000),
             pct: Some(1.5), // 150% of standard rates
             assumption: Some(AssumptionEnum::HPB),
@@ -285,12 +320,57 @@ mod tests {
     fn test_edge_case_very_small_pct() {
         // Very small but non-zero pct should be valid
         let config = MortTableConfig {
-            xml: MortXML::default(),
+            data: MortData::default(),
             radix: None,
             pct: Some(0.001), // Very small but > 0.0
             assumption: None,
         };
 
         assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_age_and_duration_methods() {
+        use crate::mt_data::MortData;
+        use polars::prelude::*;
+
+        // Test with basic age-only data (no duration column)
+        let df_age_only = df! {
+            "age" => [20.0, 21.0, 22.0],
+            "qx" => [0.001, 0.002, 0.003]
+        }.expect("Failed to create age-only DataFrame");
+
+        let data_age_only = MortData::from_df(df_age_only).expect("Failed to create MortData");
+        let config_age_only = MortTableConfig::builder()
+            .data(data_age_only)
+            .build();
+
+        // Test age methods
+        assert_eq!(config_age_only.min_age(), 20.0);
+        assert_eq!(config_age_only.max_age(), 22.0);
+        
+        // Test duration methods (should return 0.0 when no duration column)
+        assert_eq!(config_age_only.min_duration(), 0.0);
+        assert_eq!(config_age_only.max_duration(), 0.0);
+
+        // Test with age + duration data (select table)
+        let df_with_duration = df! {
+            "age" => [25.0, 25.0, 26.0, 26.0],
+            "qx" => [0.001, 0.002, 0.002, 0.003],
+            "duration" => [0.0, 1.0, 0.0, 1.0]
+        }.expect("Failed to create duration DataFrame");
+
+        let data_with_duration = MortData::from_df(df_with_duration).expect("Failed to create MortData");
+        let config_with_duration = MortTableConfig::builder()
+            .data(data_with_duration)
+            .build();
+
+        // Test age methods
+        assert_eq!(config_with_duration.min_age(), 25.0);
+        assert_eq!(config_with_duration.max_age(), 26.0);
+        
+        // Test duration methods (should return actual min/max duration)
+        assert_eq!(config_with_duration.min_duration(), 0.0);
+        assert_eq!(config_with_duration.max_duration(), 1.0);
     }
 }

@@ -7,64 +7,27 @@
 //!
 //! ```rust
 //! use rslife::prelude::*;
-//! // Now you can use MortTableConfig, MortXML, Ax, Axn, aaxn, tpx, etc.
+//! // Now you can use MortTableConfig, MortData, Ax, Axn, aaxn, tpx, etc.
 //! ```
 
+// Actuarial calculation functions
+pub use crate::single::annuities::*;
+pub use crate::single::benefits::*;
+pub use crate::single::survivals::*;
+
+// Interest rate conversion functions
+pub use crate::int_rate_convert::*;
+
+// Certain annuities
+pub use crate::annuities_certain::*;
+
 // Core mortality table types and configuration
-pub use crate::mt_config::{AssumptionEnum, MortTableConfig};
+pub use crate::mt_config::*;
 
-pub use crate::param_config::ParamConfig;
+// Parameter structs are internal - not exposed to users
 
-// XML data loading and parsing
-pub use crate::xml::{ContentClassification, MortXML};
-
-// All actuarial calculation functions (implementation functions from whole.rs)
-
-#[rustfmt::skip]
-pub use crate::int_rate_convert::{
-    // From i to i
-    nom_i_to_eff_i,
-    eff_i_to_nom_i,
-    // From d to d,
-    eff_d_to_nom_d,
-    nom_d_to_eff_d,
-    // From i to d
-    eff_i_to_eff_d,
-    eff_i_to_nom_d,
-    nom_i_to_eff_d,
-    nom_i_to_nom_d,
-    // From d to i
-    eff_d_to_eff_i,
-    eff_d_to_nom_i,
-    nom_d_to_eff_i,
-    nom_d_to_nom_i,
-};
-
-#[rustfmt::skip]
-pub use crate::annuities_certain::{
-    // Certain Annuities
-    an, aan,
-};
-
-pub use crate::survivals::{tpx, tqx};
-
-#[rustfmt::skip]
-pub use crate::annuities::{
-    // Annuities
-    aax, aaxn,
-    Iaax, Iaaxn,
-    Daaxn,
-    gaax, gaaxn,
-};
-
-#[rustfmt::skip]
-pub use crate::benefits::{
-    // Benefits and Life Insurance
-    Ax, Ax1n, Exn, Axn,
-    IAx, IAx1n, IAxn,
-    DAx1n, DAxn,
-    gAx, gAx1n, gExn, gAxn,
-};
+// Mortality data types
+pub use crate::mt_data::MortData;
 
 // Most commonly used Polars types for working with mortality tables
 pub use polars::prelude::{DataFrame, LazyFrame, PolarsError, PolarsResult, Series};
