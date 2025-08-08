@@ -1,0 +1,40 @@
+# Exclude results folders
+/src/result*/
+/result*/
+
+# Exclude diagrams folder for now
+diagrams/
+
+# Rust build output
+**/target/
+**/*.rs.bk
+
+# Cargo package files
+Cargo.lock
+
+# IDE/editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Jujutsu VCS files
+.jj/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Backup files
+*~
+*.bak
+
+# Misc
+node_modules/
+
+
+# Large reference files
+*.pdf

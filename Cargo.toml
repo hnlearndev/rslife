@@ -1,0 +1,25 @@
+[package]
+name = "rslife"
+version = "0.2.4"
+edition = "2024"
+description = "A comprehensive Rust library for actuarial mortality table calculations and life insurance mathematics"
+license = "MIT"
+repository = "https://github.com/hnlearndev/rslife"
+homepage = "https://github.com/hnlearndev/rslife"
+documentation = "https://docs.rs/rslife"
+keywords = ["actuarial", "mortality", "insurance", "finance", "statistics"]
+categories = ["mathematics", "science", "finance"]
+authors = ["RSLife Contributors"]
+readme = "README.md"
+
+[dependencies]
+calamine = "0.30.0"
+polars = { version = "0.50.0", features = ["lazy"] }
+reqwest = { version = "0.12.22", features = ["blocking"] }
+roxmltree = "0.20.0"
+spreadsheet-ods = "0.25.0"
+garde = { version = "0.22", features = ["derive"] }
+bon = "3.6.5"
+
+[dev-dependencies]
+approx = "0.5"
