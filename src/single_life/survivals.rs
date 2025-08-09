@@ -197,21 +197,19 @@ pub fn tqx(
     #[builder(default = true)] validate: bool,
 ) -> RSLifeResult<f64> {
     let kpx_built = tpx().mt(mt).x(x).t(k).k(0.0).validate(validate);
+    let kpx = match entry_age {
+        Some(age) => kpx_built.entry_age(age).call()?,
+        None => kpx_built.call()?,
+    };
+
     let ktpx_built = tpx().mt(mt).x(x).t(t).k(k).validate(validate);
+    let ktpx = match entry_age {
+        Some(age) => ktpx_built.entry_age(age).call()?,
+        None => ktpx_built.call()?,
+    };
 
     // ✅ ₖ|ₜpₓ +  ₖ|ₜqₓ=   ₖpₓ =>  ₖ|ₜqₓ = ₖpₓ - ₖ|ₜpₓ
-    match entry_age {
-        Some(age) => {
-            let kpx = kpx_built.entry_age(age).call()?;
-            let ktpx = ktpx_built.entry_age(age).call()?;
-            Ok(kpx - ktpx)
-        }
-        None => {
-            let kpx = kpx_built.call()?;
-            let ktpx = ktpx_built.call()?;
-            Ok(kpx - ktpx)
-        }
-    }
+    Ok(kpx - ktpx)
 }
 
 // =======================================
@@ -251,10 +249,10 @@ fn tpx_frac_t(mt: &MortTableConfig, x: f64, t: f64) -> RSLifeResult<f64> {
 
     Ok(survival_rate)
 }
+
 // ================================================
 // UNIT TESTS
 // ================================================
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -275,9 +273,6 @@ mod tests {
     #[test]
     fn test_survival_cm1_02() {
         // This is obtain from CM1 study package 2019 Chapter 15 The Life Table
-        // Load PFA92 table
-        // let pfa92 = MortData::from_xlsx("data/pfa92c20.xlsx", "pfa92c20")
-        //     .expect("Failed to load PFA92C20 table");
         // CFM assumption with PFA92C20
         let pfa92c20 =
             MortData::from_ifoa_custom("PFA92C20").expect("Failed to load PFA92C20 table");

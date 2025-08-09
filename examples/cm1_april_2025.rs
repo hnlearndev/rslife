@@ -5,6 +5,7 @@ use rslife::prelude::*;
 
 fn main() -> RSLifeResult<()> {
     q1()?;
+    q2()?;
     q3()?;
     q5()?;
     q7()?;
@@ -36,6 +37,50 @@ fn q1() -> RSLifeResult<()> {
 
     println!("\n=== CM1 April 2025 Q1 Results ===");
     println!("The answer is {answer:.6}");
+    Ok(())
+}
+
+fn q2() -> RSLifeResult<()> {
+    let t_income = 0.20; // Income tax
+    let t_capital_gains = 0.25; // Capital gains tax
+    let c = 0.03; // Coupon rate
+    let rv = 1.04; // Redemption value as pct of face value
+
+    let nom_i = eff_i_to_nom_i(0.065, 2);
+    let benchmark = (1.0 - t_income) * c / rv;
+    if nom_i < benchmark {
+        println!("The bond is overpriced/ Capital loss");
+    } else {
+        println!("The bond is underpriced/ Capital gain");
+    };
+
+    // P = (1.0 - t_income).0.03.a₈⁽²⁾ + 1.04v⁸  - t_capital_gains.(1.04-P)v⁸ @ i=6.5% pa effective interest rate;
+    // P = (1.0 - t_income).0.03.a₈⁽²⁾ + 1.04v⁸  - t_capital_gains.(1.04-P)v⁸
+    // P = (1.0 - t_income).0.03.a₈⁽²⁾ + 1.04v⁸ - t_capital_gains * 1.04 * v⁸ + t_capital_gains * P * v⁸
+    // P = [(1.0 - t_income).0.03.a₈⁽²⁾ + 1.04v⁸ - t_capital_gains * 1.04 * v⁸ ]/ (1.0 - t_capital_gains * v⁸)
+    // (1.0 - t_income).0.03.a₈⁽²⁾
+    let a82 = an().i(0.065).n(8).m(2).call()?;
+    let net_coupon = (1.0 - t_income) * c * a82;
+    // 1.04v⁸
+    let v: f64 = 1.0 / (1.0 + 0.065);
+    let redemption_value = rv * v.powf(8.0);
+    // t_capital_gains * 1.04 * v⁸ => tax shield on capital gains
+    let t_capital_gains_shield = t_capital_gains * 1.04 * v.powf(8.0);
+
+    let price = (net_coupon + redemption_value - t_capital_gains_shield)
+        / (1.0 - t_capital_gains * v.powf(8.0))
+        * 100.0;
+    //------------------------------------------------------------------------------------
+    // This is a simple assertion to check the result from examiner's report
+    let expected_a82 = 6.18613557;
+    assert_abs_diff_eq!(a82, expected_a82, epsilon = 1e-6);
+
+    let expected_price = 73.0047;
+    assert_abs_diff_eq!(price, expected_price, epsilon = 1e-4);
+    //------------------------------------------------------------------------------------
+
+    println!("\n=== CM1 April 2025 Q2 Results ===");
+    println!("The price of the bond is {:.4}", price);
     Ok(())
 }
 

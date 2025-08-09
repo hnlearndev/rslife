@@ -6,49 +6,40 @@
 //! ## Example
 //!
 //! ```rust
-//! # use rslife::prelude::*;
-//! use polars::prelude::*;
-//! let df = df! {
-//!     "age" => [30.0, 31.0],
-//!     "qx" => [0.001, 0.002]
-//! }?;
-//! let data = MortData::from_df(df)?;
-//! let mt_config = MortTableConfig::builder()
-//!     .data(data)
-//!     .radix(100_000)
-//!     .pct(1.0)
-//!     .assumption(AssumptionEnum::UDD)
-//!     .build()
-//!     .unwrap();
-//! let result = Ax()
-//!     .mt(&mt_config)
-//!     .i(0.03)
-//!     .x(30)
-//!     .call()?;
-//! println!("Whole life: {:.6}", result);
-//! # RSLifeResult::Ok(())
+//! use rslife::prelude::*;
+//! // Now you can use MortTableConfig, MortXML, Ax, Axn, aaxn, tpx, etc.
 //! ```
 
-// Package Result type for RSLife functions
-pub use crate::RSLifeResult;
-
-// Interest rate conversion functions
-pub use crate::int_rate_convert::*;
-
-// Certain annuities
-pub use crate::annuities_certain::*;
-
-// Actuarial calculation functions
-pub use crate::single_life::annuities::*;
-pub use crate::single_life::benefits::*;
-pub use crate::single_life::commutations::*;
-pub use crate::single_life::survivals::*;
-
 // Core mortality table types and configuration
+pub use crate::mt_config::mt_data::MortData;
 pub use crate::mt_config::{AssumptionEnum, MortTableConfig};
 
-// Mortality data type
-pub use crate::mt_config::mt_data::MortData;
+// All actuarial calculation functions (implementation functions from whole.rs)
+#[rustfmt::skip]
+pub use crate::int_rate_convert::*;
+
+pub use crate::annuities_certain::{Daan, Dan, Iaan, Ian, aan, an};
+
+pub use crate::single_life::survivals::{tpx, tqx};
+
+pub use crate::single_life::commutations::{Cx, Dx, Mx, Nx, Rx, Sx};
+
+#[rustfmt::skip]
+pub use crate::single_life::benefits::{
+    Exn, Axn1, Ax1n, Ax, Axn,
+    IAx1n, IAxn, IAx,
+    DAx1n, DAxn,
+    gAx1n, gAxn, gAx,
+};
+
+#[rustfmt::skip]
+pub use crate::single_life::annuities::{
+    aaxn,aax, Iaaxn, Iaax, Daaxn, gaax, gaaxn,
+    axn,ax, Iaxn, Iax, Daxn, gax, gaxn,
+};
 
 // Most commonly used Polars types for working with mortality tables
 pub use polars::prelude::{DataFrame, LazyFrame, PolarsError, PolarsResult, Series};
+
+// Package Result type for RSLife functions
+pub use crate::RSLifeResult;

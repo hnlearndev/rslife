@@ -661,6 +661,7 @@ fn validate_df_schema(df: &DataFrame) -> RSLifeResult<()> {
                 .u32()
                 .map(|ca| ca.into_no_null_iter().collect())
                 .unwrap_or_default();
+
             // Sort ascending and check whether they are consecutive numbers
             values.sort_unstable();
             if values.len() > 1 {

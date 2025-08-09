@@ -589,11 +589,6 @@ fn _pivot_2D_data(df: DataFrame, value_column: &str) -> PolarsResult<DataFrame> 
         agg_exprs.push(expr);
     }
 
-    println!(
-        "Ending pivoting DataFrame with value column: {}",
-        value_column
-    );
-
     // Use group_by and agg to pivot the data
     df.clone()
         .lazy()

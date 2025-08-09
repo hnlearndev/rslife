@@ -1,11 +1,11 @@
 #![allow(non_snake_case)]
 #![allow(clippy::too_many_arguments)]
 
+use super::survivals::{tpx, tqx};
 use crate::RSLifeResult;
 use crate::helpers::get_new_config_with_selected_table;
 use crate::mt_config::MortTableConfig;
 use crate::params::SingleLifeParams;
-use crate::single_life::survivals::{tpx, tqx};
 use bon::builder;
 
 // =======================================
@@ -935,60 +935,6 @@ pub fn gAx1n(
     }
 }
 
-/// Immediate geometric n-year pure endowment
-///
-/// Present value of a benefit growing geometrically at rate g each year, paid only if the insured survives n years after time t.
-/// The effective interest rate is adjusted: i' = (1+i)/(1+g) - 1.
-///
-/// # Formula
-/// ```text
-/// Aₓ:ₙ̅¹⁽ᵍ⁾ = Exn(i')
-/// where i' = (1+i)/(1+g) - 1
-/// ```
-/// - `g` is the geometric growth rate of the benefit
-/// - All other parameters as in Exn
-///
-/// # Examples
-///
-/// ## Basic Geometric Pure Endowment
-/// ```rust
-/// # use rslife::prelude::*;
-/// # let mort_data = MortData::from_soa_url_id(1704)?;
-/// # let config = MortTableConfig::builder().data(mort_data).build()?;
-/// let geom_endowment = gExn().mt(&config).i(0.03).x(40).n(10).g(0.02).call()?;
-/// println!("Geometric pure endowment: {:.6}", geom_endowment);
-/// # RSLifeResult::Ok(())
-/// ```
-#[builder]
-pub fn gExn(
-    mt: &MortTableConfig,
-    i: f64,
-    x: u32,
-    n: u32,
-    #[builder(default = 0)] t: u32,
-    #[builder(default = 1)] moment: u32,
-    entry_age: Option<u32>,
-    #[builder(default = true)] validate: bool,
-    g: f64,
-) -> RSLifeResult<f64> {
-    // Replace the effective interest rate with the adjusted one
-    let new_i = (1.0 + i) / (1.0 + g) - 1.0;
-
-    let built = Exn()
-        .mt(mt)
-        .i(new_i)
-        .x(x)
-        .n(n)
-        .t(t)
-        .moment(moment)
-        .validate(validate);
-
-    match entry_age {
-        Some(age) => built.entry_age(age).call(),
-        None => built.call(),
-    }
-}
-
 /// Immediate geometric n-year endowment
 ///
 /// Present value of a benefit growing geometrically at rate g each year, paid at the moment of death (if death occurs within n years after time t), or at the end of n years if the insured survives.
@@ -1048,6 +994,8 @@ pub fn gAxn(
 // ================================================
 // PRIVATE FUNCTIONS
 // ================================================
+
+#[derive(PartialEq)]
 enum CashFlowStructure {
     Flat,
     Increasing,
@@ -1087,9 +1035,6 @@ fn benefit_procedure(
     // Decide if selected table is used
     let mt = get_new_config_with_selected_table(mt, entry_age)?;
 
-    // Deferred factor: ₜEₓ
-    let deferred_factor = Exn().mt(&mt).i(i).x(x).n(t).validate(false).call()?;
-
     // Initialize k array
     let k_arr: Vec<f64> = (0..n * m).map(|k| k as f64).collect();
 
@@ -1101,13 +1046,14 @@ fn benefit_procedure(
     let m = f64::from(m);
     let moment = f64::from(moment);
 
-    // Discount factor: v^(moment * (k+1)/m)
+    // ----------Discount factor----------
     let discount_factors: Vec<f64> = k_arr
         .iter()
         .map(|&k| v.powf(moment * ((k + 1.0) / m)))
         .collect();
 
-    // Probabilities vectors: ₖ/ₘ|₁/ₘqₓ₊ₜ
+    // ----------Probabilities vectors----------
+    //ₖ/ₘ|₁/ₘqₓ₊ₜ
     let probabilities: Vec<f64> = k_arr
         .iter()
         .map(|&k| {
@@ -1122,8 +1068,8 @@ fn benefit_procedure(
         })
         .collect();
 
-    // Benefit vector
-    let benefits: Vec<f64> = match structure {
+    // ----------Benefit vector----------
+    let amounts: Vec<f64> = match structure {
         CashFlowStructure::Flat => vec![1.0; (n * m) as usize],
         CashFlowStructure::Increasing => k_arr.iter().map(|&k| (k / m).floor() + 1.0).collect(),
         CashFlowStructure::Decreasing => k_arr.iter().map(|&k| n - (k / m).floor()).collect(),
@@ -1133,9 +1079,12 @@ fn benefit_procedure(
     let summation: f64 = discount_factors
         .iter()
         .zip(probabilities.iter())
-        .zip(benefits.iter())
-        .map(|((df, prob), benefit)| df * prob * benefit)
+        .zip(amounts.iter())
+        .map(|((df, prob), amount)| df * prob * amount)
         .sum();
+
+    // Deferred factor: ₜEₓ = vᵗ · ₜpₓ
+    let deferred_factor = v.powf(t) * tpx().mt(&mt).x(x).t(t).validate(false).call()?;
 
     // Final result
     Ok(summation * deferred_factor)

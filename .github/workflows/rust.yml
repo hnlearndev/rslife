@@ -20,7 +20,7 @@ jobs:
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: '1.89.0'
 
       - name: Build
         run: cargo build --verbose

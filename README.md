@@ -17,7 +17,7 @@ A comprehensive Rust library for actuarial mortality table calculations and life
 
 **🎯 Developer Experience:**
 
-- **Intuitive Builder Pattern**: Only specify parameters you need, no confusing parameter lists
+- **Intuitive Builder Pattern**: Only specify parameters you need, no confusing parameter lists. RSLife ensures that the low level interfaces are even more approachable than the high level ones.
 - **Type Safety**: Compile-time validation prevents common actuarial calculation errors
 - **Auto-Completion**: IDEs provide intelligent suggestions for all parameters
 - **Self-Documenting**: Parameter names make code intent crystal clear
@@ -45,7 +45,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rslife = "0.2.4"
+rslife = "0.2.5"
 ```
 
 ### The Builder Pattern Advantage
@@ -188,14 +188,27 @@ All functions now use the builder pattern with `SingleLifeParams` and `SurvivalF
 
 **Cetain annuities:**
 
-- `aan`, `an`
+Present value and future value
+
+- `aan`, `an`, `ssn`,`sn`
+- `Iaan`, `Ian`, `Issn`, `Isn`,
+- `Daan`, `Dan`, `Dssn`, `Dsn`,
 
 **Annuities:**
+
+Due/In-advance version:
 
 - `aax`, `aaxn`
 - `Iaax`, `Iaaxn`
 - `Daaxn`
 - `gaax`, `gaaxn`
+
+Immediate/In-arrears version:
+
+- `ax`, `axn`
+- `Iax`, `Iaxn`
+- `Daxn`
+- `gax`, `gaxn`
 
 **Benefits and Life Insurance:**
 

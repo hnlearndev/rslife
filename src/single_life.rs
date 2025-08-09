@@ -44,6 +44,7 @@
 //! - This module assumes the use of Rust's standard error handling with `Result` and `Option` types.
 //! - For more advanced usage, consider exploring the individual submodules for specialized functions and calculations.
 
+// Module structure
 pub mod annuities;
 pub mod benefits;
 pub mod commutations;
