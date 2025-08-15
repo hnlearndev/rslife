@@ -35,6 +35,7 @@ A comprehensive Rust library for actuarial mortality table calculations and life
 
 - **Complete Actuarial Coverage**: Life insurance, annuities,survival functions and commutations with standard notation
 - **Multiple Assumptions**: Uniform Death Distribution (UDD), Constant Force of Mortality (CFM), and Hyperbolic (HPB) methods for fractional age calculations
+- **Multiple Parametric Life Table Models**: Constant Force Law, Gompertz, and Makeham, Weibull etc...
 - **Consistent API**: All functions use the same parameter structure with builder pattern
 - **Battle-Tested**: Validated against standard actuarial references from SOA and IFOA most trusted materials.
 - **Error Handling**: Clear, actionable error messages for debugging
@@ -64,7 +65,16 @@ fn main() -> RSLifeResult<()> {
     let soa_data = MortData::from_soa_url_id(1704)?;
 
     // Load mortality data from IFOA database (Institute and Faculty of Actuaries)
-    let ifoa_data = Mortdata::from_ifoa_url_id("AM92")?;
+    let ifoa_data = MortData::from_ifoa_url_id("AM92")?;
+
+    // Most commonly known parametric life table model - This is in fact SULT from SOA
+    // Note: There are more direct method to call SULT built-in the crate though
+    let makeham_data = MortData:::from_Makeham_law()
+      .A(0.00022)
+      .B(2.7e-6)
+      .C(1.124)
+      .start_age(20)
+      .call()?;
 
     // Construct Mortality Table Config
     let mt_builder = MortTableConfig::builder()
@@ -131,13 +141,21 @@ let result = Ax()
 
 RSLife supports flexible mortality data input with automatic `qx`/`lx` detection.
 
-Users can load the data directly from most trusted mortality database or use their own custom data under various methods.
+Beside several well-known parametric life table (Constant Force, Gomprtz, Makeham, Weibull, etc ...), users can even load the data directly from most trusted mortality database or use their own custom data under various methods.
 
 Details guide can be found on project [wiki](https://github.com/hnlearndev/rslife/wiki)
 
 ```rust
 use polars::prelude::*;
 use rslife::prelude::*;
+
+// Parametric life table model
+  let makeham_model_data = MortData:::from_Makeham_law()
+    .A(0.00022)
+    .B(2.7e-6)
+    .C(1.124)
+    .start_age(20)
+    .call()?;
 
 // DataFrames - mortality rates or survivor functions
 let df_qx = df! {

@@ -837,9 +837,7 @@ mod tests {
         // Calculate increasing life annuity (Ia)x for age 50
         // Note: No entry_age needed for whole life increasing annuity
         let ans = Iaax().mt(&mt).i(0.04).x(50).call().unwrap();
-
         let expected = 231.007;
-        // Lower down the precision to 4 decimal places since the expected value is rounded
         assert_abs_diff_eq!(ans, expected, epsilon = 1e-4);
     }
 }

@@ -36,7 +36,7 @@
 #![allow(non_snake_case)]
 
 // Create a structure for the module
-pub mod ifoa_xls;
+mod ifoa_xls;
 pub mod mt_data;
 mod soa_xml;
 
@@ -160,6 +160,11 @@ impl MortTableConfig {
             .flatten()
             .max()
             .ok_or_else(|| PolarsError::ComputeError("No age data available".into()))
+    }
+
+    // Alias for max_age
+    pub fn omega(&self) -> PolarsResult<u32> {
+        self.max_age()
     }
 
     pub fn min_duration(&self) -> PolarsResult<u32> {

@@ -1,6 +1,7 @@
 use super::ifoa_xls::IFOAMortXLS;
 use super::soa_xml::SOAMortXML;
 use crate::RSLifeResult;
+use bon::bon;
 use calamine::{Data, Reader, open_workbook_auto};
 use polars::prelude::*;
 use spreadsheet_ods::{Value, read_ods};
@@ -13,6 +14,7 @@ pub struct MortData {
     pub dataframe: DataFrame,
 }
 
+#[bon]
 impl MortData {
     /// Create a new MortData instance with custom category and DataFrame.
     ///
@@ -62,6 +64,136 @@ impl MortData {
         };
 
         Ok(result)
+    }
+
+    // ========================================================
+    // Parametric Mortality Laws
+    // ========================================================
+    #[builder]
+    pub fn from_Constant_Force_law(
+        lambda: f64,
+        #[builder(default = 0)] start_age: u32,
+        #[builder(default = 150)] omega: u32, // end_age
+    ) -> RSLifeResult<Self> {
+        // Constant force of mortality law:
+        // μₓ = λ
+        // S₀(x) = exp(-λx)
+        // ₜpₓ = exp(-λt)
+        // qₓ = 1 - exp(-λ)
+
+        if lambda <= 0.0 {
+            return Err("Lambda must be positive".into());
+        }
+
+        let ages: Vec<u32> = (start_age..=omega).collect();
+        let qx: Vec<f64> = ages
+            .iter()
+            .map(|&x| 1.0 - (-lambda * x as f64).exp())
+            .collect();
+
+        let data = df! {
+            "age" => ages,
+            "qx" => qx,
+        }?;
+
+        // Create MortData from the first table in the XML
+        let category = "Parametric Mortality Data".to_string();
+        let description = "Constant Force Law".to_string();
+        Self::new(category, description, data)
+    }
+
+    #[builder]
+    pub fn from_DeMoirve_law(
+        #[builder(default = 0)] start_age: u32,
+        #[builder(default = 150)] omega: u32, // end_age
+    ) -> RSLifeResult<Self> {
+        // De Moirve law:
+        // μₓ = 1/(ω - x) for 0 ≤ x < ω
+        // S₀(x) = 1-(x/ω)
+        // ₜpₓ = S₀(x + t) / S₀(x) = 1 - t/(ω-x)
+        // qₓ = 1 - (1 - 1/(ω-x)) = 1/(ω-x)
+        let ages: Vec<u32> = (start_age..omega).collect(); // This excludes omega
+        let qx: Vec<f64> = ages
+            .iter()
+            .map(|&x| 1.0 - (x as f64 / omega as f64))
+            .collect();
+
+        let data = df! {
+            "age" => ages,
+            "qx" => qx,
+        }?;
+
+        // Create MortData from the first table in the XML
+        let category = "Parametric Mortality Data".to_string();
+        let description = "De Moirve Law".to_string();
+        Self::new(category, description, data)
+    }
+
+    #[builder]
+    pub fn from_Gompertz_law(
+        B: f64,
+        C: f64,
+        #[builder(default = 0)] start_age: u32,
+        #[builder(default = 150)] omega: u32, // end_age,
+    ) -> RSLifeResult<Self> {
+        // Gompertz law:
+        // μₓ = B.Cˣ
+        // S₀(x) = exp[-B/log(C) * (Cˣ - 1)] x ≥ 0, B > 0, c > 1
+        // ₜpₓ = S₀(x + t) / S₀(x) = exp[-B/log(C).Cˣ.(Cᵗ - 1)]
+        // qₓ = 1 - exp[-B/log(C).Cˣ.(C - 1)]
+
+        // Validate
+        if B <= 0.0 || C <= 1.0 {
+            return Err("Gompertz parameters must be B > 0 and C > 1".into());
+        }
+
+        let ages: Vec<u32> = (start_age..=omega).collect();
+        let qx: Vec<f64> = ages
+            .iter()
+            .map(|&x| 1.0 - (-B / C.ln() * C.powf(x as f64) * (C - 1.0)).exp())
+            .collect();
+
+        // Keep 1 qx value equals to 1.0
+        let data = keep_first_qx_1_remove_the_rest(ages, qx)?;
+
+        // Create MortData from the first table in the XML
+        let category = "Parametric Mortality Data".to_string();
+        let description = "Gompertz Law".to_string();
+        Self::new(category, description, data)
+    }
+
+    #[builder]
+    pub fn from_Makeham_law(
+        A: f64,
+        B: f64,
+        C: f64,
+        #[builder(default = 0)] start_age: u32,
+        #[builder(default = 150)] omega: u32, // end_age
+    ) -> RSLifeResult<Self> {
+        // Makeham law:
+        // μₓ = A + B.Cˣ  x ≥ 0, B > 0, c > 1, A >= -B
+        // S₀(x) = exp(-Ax - B  / ln(C) * (Cˣ - 1))
+        // ₜpₓ = S₀(x + t) / S₀(x) = exp[-At - B / ln(C). Cˣ(Cᵗ - 1)]
+        // qₓ = 1 - exp[-A - B / ln(C).Cˣ.(C - 1)]
+
+        // Validate parameters
+        if B <= 0.0 || C <= 1.0 || A < -B {
+            return Err("Makeham parameters must be B > 0, C > 1, and A >= -B".into());
+        }
+
+        let ages: Vec<u32> = (start_age..=omega).collect();
+        let qx: Vec<f64> = ages
+            .iter()
+            .map(|&x| 1.0 - (-A - B / C.ln() * C.powf(x as f64) * (C - 1.0)).exp())
+            .collect();
+
+        // Keep 1 qx value equals to 1.0
+        let data = keep_first_qx_1_remove_the_rest(ages, qx)?;
+
+        // Create MortData from the first table in the XML
+        let category = "Parametric Mortality Data".to_string();
+        let description = "MakeHam Law".to_string();
+        Self::new(category, description, data)
     }
 
     // ========================================================
@@ -220,43 +352,15 @@ impl MortData {
 
     pub fn from_soa_custom(id: &str) -> RSLifeResult<Self> {
         match id {
-            "SULT" => Self::from_soa_sult(),
+            // Makeham law with A=0.00022, B=2.7e-6, C=1.124
+            "SULT" => Self::from_Makeham_law()
+                .A(0.00022)
+                .B(2.7e-6)
+                .C(1.124)
+                .start_age(20)
+                .call(),
             _ => Err(format!("Unknown SOA custom id: {id}").into()),
         }
-    }
-
-    fn from_soa_sult() -> RSLifeResult<Self> {
-        // This is generated using Makeham's law for mortality
-        // SULT: SOA Ultimate Table (synthetic, Makeham's Law)
-        // ux = A + B * Cˣ, with typical values: A=0.00022, B=2.7e-6, C=1.124
-        // S₀(x) = exp(-Ax - B  / ln(C) * (Cˣ - 1))
-        // ₜpₓ = S₀(x + t) / S₀(x) = exp[-At - B / ln(C) * Cˣ(Cᵗ - 1)]
-        // qₓ = 1 - exp[-A - B / ln(C) * Cˣ(C - 1)]
-        let ages: Vec<u32> = (20u32..=150).collect();
-
-        let a = 0.00022;
-        let b = 2.7e-6;
-        let c = 1.124_f64;
-        let ln_c = c.ln();
-
-        let qx: Vec<f64> = ages
-            .iter()
-            .map(|&x| {
-                let exponent = -a - b / ln_c * c.powf(x as f64) * (c - 1.0);
-                1.0 - exponent.exp()
-            })
-            .collect();
-
-        let data = df! {
-            "age" => ages,
-            "qx" => qx,
-        }?;
-
-        // Create MortData from the first table in the XML
-        let category = "SOA Mortality Data".to_string();
-        let description = "Custom SOA Mortality Data - Standard Ultimate Life Table".to_string();
-        let result = Self::new(category, description, data)?;
-        Ok(result)
     }
 
     // ========================================================
@@ -264,6 +368,16 @@ impl MortData {
     // ========================================================
     pub fn from_ifoa_xls_file_path_str(file_path: &str, sheet_name: &str) -> RSLifeResult<Self> {
         let data = IFOAMortXLS::from_xls_file_path_str(file_path, sheet_name)?;
+        let result = Self::new(
+            "IFOA Mortality Data".to_string(),
+            data.description,
+            data.dataframe,
+        )?;
+        Ok(result)
+    }
+
+    pub fn from_ifoa_url(url: &str) -> RSLifeResult<Self> {
+        let data = IFOAMortXLS::from_url(url)?;
         let result = Self::new(
             "IFOA Mortality Data".to_string(),
             data.description,
@@ -685,6 +799,34 @@ fn validate_df_schema(df: &DataFrame) -> RSLifeResult<()> {
 // ================================================
 // PRIVATE FUNCTIONS
 // ================================================
+fn keep_first_qx_1_remove_the_rest(ages: Vec<u32>, qx: Vec<f64>) -> RSLifeResult<DataFrame> {
+    let mut found_one = false;
+    let filtered: Vec<(u32, f64)> = ages
+        .into_iter()
+        .zip(qx)
+        .filter(|&(_, rate)| {
+            if rate == 1.0 {
+                if !found_one {
+                    found_one = true;
+                    true
+                } else {
+                    false
+                }
+            } else {
+                true
+            }
+        })
+        .collect();
+    let (ages, qx): (Vec<u32>, Vec<f64>) = filtered.into_iter().unzip();
+
+    let data = df! {
+        "age" => ages,
+        "qx" => qx,
+    }?;
+
+    Ok(data)
+}
+
 fn setup_dataframe_to_correct_schema(df: DataFrame) -> PolarsResult<DataFrame> {
     // This function assumes DataFrame has already been validated
     // Validation is done in from_df() before calling this function
