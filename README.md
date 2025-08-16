@@ -46,7 +46,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rslife = "0.2.5"
+rslife = "0.2.6"
 ```
 
 ### The Builder Pattern Advantage
