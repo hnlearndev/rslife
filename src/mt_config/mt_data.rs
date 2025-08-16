@@ -69,6 +69,39 @@ impl MortData {
     // ========================================================
     // Parametric Mortality Laws
     // ========================================================
+    /// Create a parametric mortality table using the Constant Force Law.
+    ///
+    /// The force of mortality is constant:
+    /// ```text
+    /// μₓ = λ
+    /// ```
+    /// Survival functions:
+    /// ```text
+    /// S₀(x) = exp(-λx)
+    /// ₜpₓ = S₀(x + t) / S₀(x) = exp(-λt)
+    /// ```
+    /// Mortality rate:
+    /// ```text
+    /// qₓ = 1 - pₓ = 1 - exp(-λ)
+    /// ```
+    ///
+    /// # Parameters
+    /// - `lambda`: Force of mortality (λ), must be positive.
+    /// - `start_age`: Starting age for the table (default: 0).
+    /// - `omega`: Limiting age for the table (default: 150).
+    ///
+    /// # Errors
+    /// - Lambda must be positive.
+    ///
+    /// # Example
+    /// ```rust
+    /// # use rslife::prelude::*;
+    /// let data = MortData::from_Constant_Force_law()
+    ///     .lambda(0.08)
+    ///     .start_age(30)
+    ///     .call()?;
+    ///# RSLifeResult::Ok(())
+    /// ```
     #[builder]
     pub fn from_Constant_Force_law(
         lambda: f64,
@@ -102,6 +135,35 @@ impl MortData {
         Self::new(category, description, data)
     }
 
+    /// Create a parametric mortality table using the De Moirve Law.
+    ///
+    /// The force of mortality is inversely related to limiting age:
+    /// ```text
+    /// μₓ = 1/(ω - x)
+    /// ```
+    /// Survival functions:
+    /// ```text
+    /// S₀(x) = 1 - x/ω
+    /// ₜpₓ = S₀(x + t) / S₀(x) = (1 - (x + t)/ω) / (1 - x/ω)
+    /// ```
+    /// Mortality rate:
+    /// ```text
+    /// qₓ = 1/(ω - x)
+    /// ```
+    ///
+    /// # Parameters
+    /// - `start_age`: Starting age for the table (default: 0).
+    /// - `omega`: Limiting age for the table (default: 150).
+    ///
+    /// # Example
+    /// ```rust
+    /// # use rslife::prelude::*;
+    /// let data = MortData::from_DeMoirve_law()
+    ///     .start_age(30)
+    ///     .omega(120)
+    ///     .call()?;
+    /// # RSLifeResult::Ok(())
+    /// ```
     #[builder]
     pub fn from_DeMoirve_law(
         #[builder(default = 0)] start_age: u32,
@@ -129,6 +191,42 @@ impl MortData {
         Self::new(category, description, data)
     }
 
+    /// Create a parametric mortality table using the Gompertz Law.
+    ///
+    /// The force of mortality increases exponentially with age:
+    /// ```text
+    /// μₓ = B·Cˣ
+    /// ```
+    /// Survival functions:
+    /// ```text
+    /// S₀(x) = exp(-B·(Cˣ - 1)/ln(C))
+    /// ₜpₓ = S₀(x + t) / S₀(x) = exp(-B·Cˣ·(Cᵗ - 1)/ln(C))
+    /// ```
+    /// Mortality rate:
+    /// ```text
+    /// qₓ = 1 - exp(-B·Cˣ·(C - 1)/ln(C))
+    /// ```
+    ///
+    /// # Parameters
+    /// - `B`: Gompertz parameter, must be > 0.
+    /// - `C`: Gompertz parameter, must be > 1.
+    /// - `start_age`: Starting age for the table (default: 0).
+    /// - `omega`: Limiting age for the table (default: 150).
+    ///
+    /// # Errors
+    /// - B must be > 0, C must be > 1.
+    ///
+    /// # Example
+    /// ```rust
+    /// # use rslife::prelude::*;
+    /// let data = MortData::from_Gompertz_law()
+    ///     .B(0.0005)
+    ///     .C(1.08)
+    ///     .start_age(40)
+    ///     .omega(110)
+    ///     .call()?;
+    /// # RSLifeResult::Ok(())
+    /// ```
     #[builder]
     pub fn from_Gompertz_law(
         B: f64,
@@ -150,7 +248,11 @@ impl MortData {
         let ages: Vec<u32> = (start_age..=omega).collect();
         let qx: Vec<f64> = ages
             .iter()
-            .map(|&x| 1.0 - (-B / C.ln() * C.powf(x as f64) * (C - 1.0)).exp())
+            .map(|&x| {
+                let x = f64::from(x);
+                let exponent = -B / C.ln() * (C.powf(x) * (C - 1.0));
+                1.0 - exponent.exp()
+            })
             .collect();
 
         // Keep 1 qx value equals to 1.0
@@ -162,6 +264,44 @@ impl MortData {
         Self::new(category, description, data)
     }
 
+    /// Create a parametric mortality table using the Makeham Law.
+    ///
+    /// Adds a constant to Gompertz:
+    /// ```text
+    /// μₓ = A + B·Cˣ
+    /// ```
+    /// Survival functions:
+    /// ```text
+    /// S₀(x) = exp(-A·x - B·(Cˣ - 1)/ln(C))
+    /// ₜpₓ = S₀(x + t) / S₀(x) = exp(-A·t - B·Cˣ·(Cᵗ - 1)/ln(C))
+    /// ```
+    /// Mortality rate:
+    /// ```text
+    /// qₓ = 1 - exp(-A - B·Cˣ·(C - 1)/ln(C))
+    /// ```
+    ///
+    /// # Parameters
+    /// - `A`: Makeham parameter, must be >= -B.
+    /// - `B`: Makeham parameter, must be > 0.
+    /// - `C`: Makeham parameter, must be > 1.
+    /// - `start_age`: Starting age for the table (default: 0).
+    /// - `omega`: Limiting age for the table (default: 150).
+    ///
+    /// # Errors
+    /// - B must be > 0, C must be > 1, A must be >= -B.
+    ///
+    /// # Example
+    /// ```rust
+    /// # use rslife::prelude::*;
+    /// let data = MortData::from_Makeham_law()
+    ///     .A(0.00022)
+    ///     .B(2.7e-6)
+    ///     .C(1.124)
+    ///     .start_age(20)
+    ///     .omega(120)
+    ///     .call()?;
+    /// # RSLifeResult::Ok(())
+    /// ```
     #[builder]
     pub fn from_Makeham_law(
         A: f64,
@@ -184,7 +324,84 @@ impl MortData {
         let ages: Vec<u32> = (start_age..=omega).collect();
         let qx: Vec<f64> = ages
             .iter()
-            .map(|&x| 1.0 - (-A - B / C.ln() * C.powf(x as f64) * (C - 1.0)).exp())
+            .map(|&x| {
+                let x = f64::from(x);
+                let exponent = -A - B / C.ln() * C.powf(x) * (C - 1.0);
+                1.0 - exponent.exp()
+            })
+            .collect();
+
+        // Keep 1 qx value equals to 1.0
+        let data = keep_first_qx_1_remove_the_rest(ages, qx)?;
+
+        // Create MortData from the first table in the XML
+        let category = "Parametric Mortality Data".to_string();
+        let description = "MakeHam Law".to_string();
+        Self::new(category, description, data)
+    }
+
+    /// Create a parametric mortality table using the Weibull Law.
+    ///
+    /// The force of mortality follows a Weibull distribution:
+    /// ```text
+    /// μₓ = k·xⁿ
+    /// ```
+    /// Survival functions:
+    /// ```text
+    /// S₀(x) = exp(-k/(n+1)xⁿ⁺¹)
+    /// ₜpₓ = S₀(x + t) / S₀(x) = exp{-k/(n+1).[(x + t)ⁿ⁺¹ - xⁿ⁺¹)]}
+    /// ```
+    /// Mortality rate:
+    /// ```text
+    /// qₓ = 1 - exp{-k/(n+1).[(x + 1)ⁿ⁺¹ - xⁿ⁺¹)]}
+    /// ```
+    ///
+    /// # Parameters
+    /// - `k`: Weibull parameter, must be > 0.
+    /// - `n`: Weibull parameter, must be > 1.
+    /// - `start_age`: Starting age for the table (default: 0).
+    /// - `omega`: Limiting age for the table (default: 150).
+    ///
+    /// # Errors
+    /// - k must be > 0, n must be > 1.
+    ///
+    /// # Example
+    /// ```rust
+    /// # use rslife::prelude::*;
+    /// let data = MortData::from_Weibull_law()
+    ///     .k(0.0001)
+    ///     .n(2.5)
+    ///     .start_age(30)
+    ///     .omega(120)
+    ///     .call()?;
+    /// # RSLifeResult::Ok(())
+    /// ```
+    #[builder]
+    pub fn from_Weibull_law(
+        k: f64,
+        n: f64,
+        #[builder(default = 0)] start_age: u32,
+        #[builder(default = 150)] omega: u32, // end_age
+    ) -> RSLifeResult<Self> {
+        // Weibull law:
+        // μₓ = kxⁿ  k > 0, n > 1
+        // S₀(x) = exp(-k/(n+1)xⁿ⁺¹)
+        // ₜpₓ = S₀(x + t) / S₀(x) = exp{-k/(n+1).[(x + t)ⁿ⁺¹ - xⁿ⁺¹)]}
+        // qₓ = 1 - exp{-k/(n+1).[(x + 1)ⁿ⁺¹ - xⁿ⁺¹)]}
+
+        // Validate parameters
+        if k <= 0.0 || n <= 1.0 {
+            return Err("Weibull parameters must be k > 0, n > 1".into());
+        }
+
+        let ages: Vec<u32> = (start_age..=omega).collect();
+        let qx: Vec<f64> = ages
+            .iter()
+            .map(|&x| {
+                let x = f64::from(x);
+                let exponent = -k / (n + 1.0) * ((x + 1.0).powf(n + 1.0) - x.powf(n + 1.0));
+                1.0 - exponent.exp()
+            })
             .collect();
 
         // Keep 1 qx value equals to 1.0
