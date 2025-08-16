@@ -46,7 +46,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rslife = "0.2.5"
+rslife = "0.2.6"
 ```
 
 ### The Builder Pattern Advantage
@@ -292,7 +292,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Institute and Faculty of Actuaries Mortality and Morbidity Tables](https://www.actuaries.org.uk/learn-and-develop/continuous-mortality-investigation/cmi-mortality-and-morbidity-tables)
 - Standard actuarial notation and practices
 
-### Similar Projects
+## Similar Projects
 
 **Python:**
 

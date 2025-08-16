@@ -18,9 +18,9 @@ fn main() -> RSLifeResult<()> {
     println!("Creating MortTableConfig using builder pattern...");
     let mt_config = MortTableConfig::builder()
         .data(mort_data.clone())
-        .radix(100_000)
-        .pct(1.0)
-        .assumption(AssumptionEnum::UDD)
+        .radix(10_000) // Default radix - Might even not needed to be declared
+        .pct(1.0) // Default mortality percentage - Might even not needed to be declared
+        .assumption(AssumptionEnum::UDD) // Default assumption - Might even not needed to be declared
         .build()
         .unwrap();
 
