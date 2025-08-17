@@ -1103,7 +1103,6 @@ mod tests {
 
     // #[test]
     // fn test_fn_A1xn_cont_theory() {
-    //     // Edge case where n = 0 should return 0
     //     let am92 = MortData::from_ifoa_url_id("AM92").expect("Failed to load AM92 selected table");
     //     let mt = MortTableConfig::builder().data(am92).build().unwrap();
     //     let regular = Ax1n().mt(&mt).i(0.05).x(70).n(20).call().unwrap();

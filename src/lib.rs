@@ -68,6 +68,7 @@ pub type RSLifeResult<T> = Result<T, Box<dyn std::error::Error>>;
 pub mod annuities_certain;
 pub mod helpers;
 pub mod int_rate_convert;
+pub mod macros;
 pub mod mt_config;
 pub mod params;
 pub mod prelude;

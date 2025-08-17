@@ -10,10 +10,12 @@
 //! // Now you can use MortTableConfig, MortXML, Ax, Axn, aaxn, tpx, etc.
 //! ```
 
+// Macros
+pub use crate::mddf;
+
 // Core mortality table types and configuration
 pub use crate::mt_config::mt_data::MortData;
 pub use crate::mt_config::{AssumptionEnum, MortTableConfig};
-
 // All actuarial calculation functions (implementation functions from whole.rs)
 #[rustfmt::skip]
 pub use crate::int_rate_convert::*;

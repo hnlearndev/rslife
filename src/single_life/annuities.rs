@@ -8,41 +8,36 @@ use crate::mt_config::MortTableConfig;
 use crate::params::SingleLifeParams;
 use bon::builder;
 
-/// Calculate the present value of a life annuity-immediate (in arrears).
+// ==================In arrears==================
+/// Immediate temporary annuity-due payable m times per year:
 ///
-/// This function computes the actuarial present value of a life annuity where payments are made at the end of each period (in arrears), contingent on survival.
-///
-/// # Parameters
-/// - `mt`: Mortality table configuration (see [`MortTableConfig`])
-/// - `age`: Age at entry
-/// - `n`: Number of payment periods
-/// - `i`: Interest rate per period (as a decimal, e.g., 0.03 for 3%)
-///
-/// # Returns
-/// - Present value of the annuity (f64)
+/// Present value of 1/m paid m times per year for up to n years, starting immediately, provided the insured is alive at each payment time.
 ///
 /// # Formula
-/// The present value of an annuity-immediate (in arrears) is:
-/// $$
-/// \ddot{a}_{x:\overline{n}} = \sum_{k=1}^{n} v^k \, {}_k p_x
-/// $$
+/// ```text
+/// ₜ|aₓ:ₙ̅⁽ᵐ⁾ = ₜEₓ · Σₖ₌₁^mn [1/m · vᵏ/ᵐ · ₖ/ₘpₓ₊ₜ]
+/// ```
 /// where:
-/// - $v = 1 / (1 + i)$ is the discount factor
-/// - ${}_k p_x$ is the probability of survival to time $k$
+/// - `v = 1/(1+i)` is the discount factor
+/// - `ₜEₓ` is the probability of surviving from age x to age x+t
+/// - `ₖ/ₘpₓ₊ₜ` is the probability of surviving k/m years after age x+t
+/// - `n` is the term of the annuity
+/// - `t` is the deferral period (default 0)
+/// - `m` is the number of payments per year (default 1)
+/// - `moment` is the moment to calculate (default 1, i.e., mean)
+/// - `entry_age` is the age at which the insured enters the policy (default None, uses ultimate table)
 ///
-/// # Example
+/// # Examples
+///
+/// ## Basic Temporary Annuity-Due
 /// ```rust
 /// # use rslife::prelude::*;
-/// //let pv = annuity_immediate(mt, 65, 10, 0.03)?;
-/// //println!("Present value: {:.2}", pv);
+/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let config = MortTableConfig::builder().data(mort_data).build().unwrap();
+/// let temp_annuity = axn().mt(&config).i(0.03).x(45).n(10).call()?;
+/// println!("Temporary annuity-due: {:.6}", temp_annuity);
 /// # RSLifeResult::Ok(())
 /// ```
-///
-/// # See Also
-/// - [`annuity_due`] for payments in advance
-/// - [`MortTableConfig`] for mortality table setup
-
-// ==================In arrears==================
 #[builder]
 pub fn axn(
     mt: &MortTableConfig,
@@ -70,6 +65,35 @@ pub fn axn(
     )
 }
 
+/// Immediate temporary annuity-due payable m times per year:
+///
+/// Present value of 1/m paid m times per year for up to n years, starting immediately, provided the insured is alive at each payment time.
+///
+/// # Formula
+/// ```text
+/// ₜ|aₓ⁽ᵐ⁾ = ₜEₓ · Σₖ₌₁^∞ [1/m · vᵏ/ᵐ · ₖ/ₘpₓ₊ₜ]
+/// ```
+/// where:
+/// - `v = 1/(1+i)` is the discount factor
+/// - `ₜEₓ` is the probability of surviving from age x to age x+t
+/// - `ₖ/ₘpₓ₊ₜ` is the probability of surviving k/m years after age x+t
+/// - `n` is the term of the annuity
+/// - `t` is the deferral period (default 0)
+/// - `m` is the number of payments per year (default 1)
+/// - `moment` is the moment to calculate (default 1, i.e., mean)
+/// - `entry_age` is the age at which the insured enters the policy (default None, uses ultimate table)
+///
+/// # Examples
+///
+/// ## Basic Temporary Annuity-Due
+/// ```rust
+/// # use rslife::prelude::*;
+/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let config = MortTableConfig::builder().data(mort_data).build().unwrap();
+/// let temp_annuity = ax().mt(&config).i(0.03).x(50).call()?;
+/// println!("Temporary annuity-due: {:.6}", temp_annuity);
+/// # RSLifeResult::Ok(())
+/// ```
 #[builder]
 pub fn ax(
     mt: &MortTableConfig,
@@ -98,6 +122,37 @@ pub fn ax(
     )
 }
 
+//-----------------Increasing------------------
+/// Immediate increasing temporary life annuity-due payable m times per year:
+///
+/// Present value of an increasing life annuity-immediate: payments of 1/m made m times per year for n years, with each annual payment increasing by 1 (i.e., k-th annual payment is k).
+/// For m=12, k=0..11 the annuity is 1/m, k=12..23 the annuity is 2/m, etc.
+///
+/// # Formula
+/// ```text
+/// ₜ|(Ia)ₓ:ₙ̅⁽ᵐ⁾ = ₜEₓ · Σₖ₌₁^mn [(k-1)//m + 1) / m · vᵏ/ᵐ · ₖ/ₘpₓ₊ₜ]
+/// ```
+/// where:
+/// - `v = 1/(1+i)` is the discount factor
+/// - `ₜEₓ` is the probability of surviving from age x to age x+t
+/// - `ₖ/ₘpₓ₊ₜ` is the probability of surviving k/m years after age x+t
+/// - `n` is the term of the annuity
+/// - `m` is the number of payments per year (default 1)
+/// - `t` is the deferral period (default 0)
+/// - `moment` is the moment to calculate (default 1, i.e., mean)
+/// - `entry_age` is the age at which the insured enters the policy (default None, uses ultimate table)
+///
+/// # Examples
+///
+/// ## Basic Increasing Temporary Annuity-Due
+/// ```rust
+/// # use rslife::prelude::*;
+/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let config = MortTableConfig::builder().data(mort_data).build().unwrap();
+/// let inc_temp_annuity = Iaxn().mt(&config).i(0.03).x(45).n(12).call()?;
+/// println!("Increasing temporary annuity-immediate: {:.6}", inc_temp_annuity);
+/// # RSLifeResult::Ok(())
+/// ```
 #[builder]
 pub fn Iaxn(
     mt: &MortTableConfig,
@@ -125,6 +180,35 @@ pub fn Iaxn(
     )
 }
 
+/// Increasing life annuity-due payable m times per year:
+///
+/// Present value of an increasing life annuity-immediate: payments of 1/m made m times per year for life, with each annual payment increasing by 1 (i.e., k-th annual payment is k).
+/// For m=12, k=0..11 the annuity is 1/m, k=12..23 the annuity is 2/m, etc.
+///
+/// # Formula
+/// ```text
+/// ₜ|(Ia)ₓ⁽ᵐ⁾ = ₜEₓ · Σₖ₌₁^∞ [((k // m) + 1) / m · vᵏ/ᵐ · ₖ/ₘpₓ₊ₜ]
+/// ```
+/// where:
+/// - `v = 1/(1+i)` is the discount factor
+/// - `ₜEₓ` is the probability of surviving from age x to age x+t
+/// - `ₖ/ₘpₓ₊ₜ` is the probability of surviving k/m years after age x+t
+/// - `m` is the number of payments per year (default 1)
+/// - `t` is the deferral period (default 0)
+/// - `moment` is the moment to calculate (default 1, i.e., mean)
+/// - `entry_age` is the age at which the insured enters the policy (default None, uses ultimate table)
+///
+/// # Examples
+///
+/// ## Basic Increasing Life Annuity-Due
+/// ```rust
+/// # use rslife::prelude::*;
+/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let config = MortTableConfig::builder().data(mort_data).build().unwrap();
+/// let inc_annuity = Iaax().mt(&config).i(0.03).x(40).call()?;
+/// println!("Increasing life annuity-due: {:.6}", inc_annuity);
+/// # RSLifeResult::Ok(())
+/// ```
 #[builder]
 pub fn Iax(
     mt: &MortTableConfig,
@@ -153,6 +237,37 @@ pub fn Iax(
     )
 }
 
+//-----------------Decreasing------------------
+/// Decreasing temporary life annuity-due:
+///
+/// Present value of a decreasing life annuity-due: payments of n/m made m times per year for n years, with each annual payment decreasing by 1 (i.e., k-th annual payment is n-k+1).
+/// For m=12, k=0..11 the annuity is n/m, k=12..23 the annuity is (n-1)/m, etc.
+///
+/// # Formula
+/// ```text
+/// ₜ|(Da)ₓ:ₙ̅⁽ᵐ⁾ = ₜEₓ · Σₖ₌₁^mn [(n - (k-1) // m)) / m · vᵏ/ᵐ · ₖ/ₘpₓ₊ₜ]
+/// ```
+/// where:
+/// - `v = 1/(1+i)` is the discount factor
+/// - `ₜEₓ` is the probability of surviving from age x to age x+t
+/// - `ₖ/ₘpₓ₊ₜ` is the probability of surviving k/m years after age x+t
+/// - `n` is the term of the annuity
+/// - `m` is the number of payments per year (default 1)
+/// - `t` is the deferral period (default 0)
+/// - `moment` is the moment to calculate (default 1, i.e., mean)
+/// - `entry_age` is the age at which the insured enters the policy (default None, uses ultimate table)
+///
+/// # Examples
+///
+/// ## Basic Decreasing Temporary Annuity-Due
+/// ```rust
+/// # use rslife::prelude::*;
+/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let config = MortTableConfig::builder().data(mort_data).build().unwrap();
+/// let dec_temp_annuity = Daaxn().mt(&config).i(0.03).x(40).n(10).call()?;
+/// println!("Decreasing temporary annuity-due: {:.6}", dec_temp_annuity);
+/// # RSLifeResult::Ok(())
+/// ```
 #[builder]
 pub fn Daxn(
     mt: &MortTableConfig,
@@ -180,6 +295,30 @@ pub fn Daxn(
     )
 }
 
+/// Geometric increasing temporary annuity-immediate:
+///
+/// Present value of a geometric increasing temporary annuity-due: payments of 1/m made m times per year for n years, with each annual payment increasing by a factor of (1+g) each year (i.e., geometric progression).
+/// The effective interest rate is adjusted: i' = (1+i)/(1+g) - 1.
+///
+/// # Formula
+/// ```text
+/// aₓ:ₙ̅⁽ᵍ⁾ = axn(i')
+/// where i' = (1+i)/(1+g) - 1
+/// ```
+/// - `g` is the geometric growth rate of the annuity
+/// - All other parameters as in aaxn
+///
+/// # Examples
+///
+/// ## Basic Geometric Temporary Annuity-Due
+/// ```rust
+/// # use rslife::prelude::*;
+/// # let mort_data = MortData::from_ifoa_url_id("AM92")?;
+/// # let config = MortTableConfig::builder().data(mort_data).build().unwrap();
+/// let geom_temp_annuity = gaxn().mt(&config).i(0.03).x(40).n(10).g(0.02).call()?;
+/// println!("Geometric temporary annuity-due: {:.6}", geom_temp_annuity);
+/// # RSLifeResult::Ok(())
+/// ```
 #[builder]
 pub fn gaxn(
     mt: &MortTableConfig,
@@ -212,6 +351,31 @@ pub fn gaxn(
     }
 }
 
+//-----------------Geometric increasing------------------
+/// Geometric increasing life annuity-due:
+///
+/// Present value of a geometric increasing life annuity-immediate: payments of 1/m made m times per year for life, with each annual payment increasing by a factor of (1+g) each year (i.e., geometric progression).
+/// The effective interest rate is adjusted: i' = (1+i)/(1+g) - 1.
+///
+/// # Formula
+/// ```text
+/// aₓ⁽ᵍ⁾ = ax(i')
+/// where i' = (1+i)/(1+g) - 1
+/// ```
+/// - `g` is the geometric growth rate of the annuity
+/// - All other parameters as in aax
+///
+/// # Examples
+///
+/// ## Basic Geometric Life Annuity-Due
+/// ```rust
+/// # use rslife::prelude::*;
+/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let config = MortTableConfig::builder().data(mort_data).build().unwrap();
+/// let geom_annuity = gax().mt(&config).i(0.03).x(40).g(0.02).call()?;
+/// println!("Geometric life annuity-due: {:.6}", geom_annuity);
+/// # RSLifeResult::Ok(())
+/// ```
 #[builder]
 pub fn gax(
     mt: &MortTableConfig,

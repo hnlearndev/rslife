@@ -28,21 +28,6 @@ use bon::builder;
 /// println!("Annuity-certain in arrears: {:.6}", annuity);
 /// # RSLifeResult::Ok(())
 /// ```
-/// Present value of an annuity-certain due (in advance).
-///
-/// Calculates the present value of an annuity-certain due: $1 per period, paid m times per year for n years, starting immediately (first payment at time 0).
-///
-/// # Formula
-/// $$
-/// 	ext{PV} = v^t \cdot \frac{1 - v^n}{d^{(m)}}
-/// $$
-/// where $v = 1/(1+i)$, $d^{(m)}$ is the nominal rate of discount convertible m times per year.
-///
-/// # Parameters
-/// - `i`: Effective annual interest rate
-/// - `n`: Number of periods
-/// - `t`: Deferral period (default 0)
-/// - `m`: Number of payments per year (default 1)
 #[builder]
 pub fn aan(
     i: f64,
@@ -64,8 +49,7 @@ pub fn aan(
 }
 
 /// Annuity-certain immeditate/in-arrears
-///
-/// Present value of an annuity-certain due: $1 per period, paid m times per year for n years, starting immediately (first payment at time 0).
+/// Present value of an annuity-certain immediate: $1 per period, paid m times per year for n years, starting immediately (first payment at time 0).
 ///
 /// # Formula
 /// ```text
@@ -89,21 +73,6 @@ pub fn aan(
 /// println!("Annuity-certain due: {:.6}", annuity_due);
 /// # RSLifeResult::Ok(())
 /// ```
-/// Present value of an annuity-certain immediate (in arrears).
-///
-/// Calculates the present value of an annuity-certain immediate: $1 per period, paid m times per year for n years, with payments at the end of each period.
-///
-/// # Formula
-/// $$
-/// 	ext{PV} = v^t \cdot \frac{1 - v^n}{i^{(m)}}
-/// $$
-/// where $v = 1/(1+i)$, $i^{(m)}$ is the nominal rate convertible m times per year.
-///
-/// # Parameters
-/// - `i`: Effective annual interest rate
-/// - `n`: Number of periods
-/// - `t`: Deferral period (default 0)
-/// - `m`: Number of payments per year (default 1)
 #[builder]
 pub fn an(
     i: f64,
@@ -124,16 +93,24 @@ pub fn an(
 /// Calculates the present value of an increasing annuity-certain due: payments increase by $1 each period, paid m times per year for n years, starting immediately (first payment at time 0).
 ///
 /// # Formula
-/// $$
-/// 	ext{PV} = v^t \cdot \frac{\text{aan} - n v^n}{d^{(m)}}
-/// $$
-/// where $v = 1/(1+i)$, $d^{(m)}$ is the nominal rate of discount convertible m times per year.
-///
+/// ```text
+/// ₜ| aₙ⁽ᵐ⁾ = vᵗ · (1 - vⁿ) / i⁽ᵐ⁾
+/// ```
 /// # Parameters
 /// - `i`: Effective annual interest rate
 /// - `n`: Number of periods
 /// - `t`: Deferral period (default 0)
 /// - `m`: Number of payments per year (default 1)
+///
+/// # Examples
+///
+/// ## Basic Annuity-Certain Due
+/// ```rust
+/// # use rslife::prelude::*;
+/// let annuity_due = aan().i(0.03).n(10).call()?;
+/// println!("Annuity-certain due: {:.6}", annuity_due);
+/// # RSLifeResult::Ok(())
+/// ```
 #[builder]
 pub fn Iaan(
     i: f64,

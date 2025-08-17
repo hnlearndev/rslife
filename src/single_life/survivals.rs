@@ -217,7 +217,7 @@ pub fn tqx(
 // =======================================
 /// Calculate ₜpₓ: probability of surviving t years from age x (whole ages only).
 ///
-/// Formula: ₜpₓ = ∏(k=0 to t-1) (1 - qₓ₊ₖ)
+/// Formula: ₜpₓ = lₓ₊ₜ / lₓ
 fn tpx_whole(mt: &MortTableConfig, x: u32, t: u32) -> RSLifeResult<f64> {
     let l_x_t = mt.lx().x(x + t).call()?;
     let l_x = mt.lx().x(x).call()?;
@@ -228,22 +228,24 @@ fn tpx_whole(mt: &MortTableConfig, x: u32, t: u32) -> RSLifeResult<f64> {
 ///
 /// Formula: ₜpₓ = ∏(k=0 to t-1) (1 - qₓ₊ₖ)
 fn tpx_frac_t(mt: &MortTableConfig, x: f64, t: f64) -> RSLifeResult<f64> {
-    // ------UDD------:
-    // ₜqₓ₊ₛ = t · qₓ / (1 - s · qₓ)
-    // ₜpₓ₊ₛ = 1 - t · qₓ / (1 - s · qₓ)
-    // ------CFM------:
-    // ₜpₓ₊ₛ = (1 - qₓ)ᵗ
-    // ------HPB-------:
-    // ₜqₓ₊ₛ = t · qₓ / (1 + s · qₓ)
-    // ₜpₓ₊ₛ = 1 - t · qₓ / (1 + s · qₓ)
     let x_whole = x.floor() as u32;
     let x_frac = x.fract();
 
     let qx = mt.qx().x(x_whole).call()?;
 
     let survival_rate = match mt.assumption {
+        // ------UDD------:
+        // ₜqₓ₊ₛ = t · qₓ / (1 - s · qₓ)
+        // ₜpₓ₊ₛ = 1 - t · qₓ / (1 - s · qₓ)
         AssumptionEnum::UDD => 1.0 - t * qx / (1.0 - x_frac * qx),
+
+        // ------CFM------:
+        // ₜpₓ₊ₛ = (1 - qₓ)ᵗ
         AssumptionEnum::CFM => (1.0 - qx).powf(t),
+
+        // ------HPB-------:
+        // ₜqₓ₊ₛ = t · qₓ / (1 + s · qₓ)
+        // ₜpₓ₊ₛ = 1 - t · qₓ / (1 + s · qₓ)
         _ => 1.0 - t * qx / (1.0 + x_frac * qx),
     };
 

@@ -1,16 +1,24 @@
-# RSLife
+<h1 align="center">
+  <a href="https://crates.io/crates/rslife">
+    <img src="https://raw.githubusercontent.com/hnlearndev/static/refs/heads/init/rslife/banner/banner.svg" alt="RSLife logo">
+  </a>
+</h1>
+
+<div align="center">
+  <a href="https://crates.io/crates/rslife"><img src="https://img.shields.io/crates/v/rslife.svg" alt="crates.io Latest Release"/></a>
+  <a href="https://docs.rs/rslife/latest/rslife/"><img src="https://docs.rs/rslife/badge.svg" alt="Documentation"/></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"/></a>
+</div>
+
+---
 
 A comprehensive Rust library for actuarial mortality table calculations and life insurance mathematics, featuring an elegant **builder pattern** that makes complex actuarial calculations intuitive and type-safe.
-
-[![Crates.io](https://img.shields.io/crates/v/rslife.svg)](https://crates.io/crates/rslife)
-[![Documentation](https://docs.rs/rslife/badge.svg)](https://docs.rs/rslife)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Why RSLife?
 
 **🚀 Performance & Memory Efficiency:**
 
-- Built on Rust's zero-cost abstractions for maximum performance
+- Leveraging Rust's zero-cost abstractions for maximum performance
 - Polars integration for efficient DataFrame operations with zero-copy optimization
 - Minimal memory allocation with smart data reuse and lazy evaluation
 - Compile-time optimizations eliminate runtime overhead
@@ -42,73 +50,142 @@ A comprehensive Rust library for actuarial mortality table calculations and life
 
 ## Quick Start
 
-Add this to your `Cargo.toml`:
+Add the crate dependency
+
+```bash
+cargo add rslife
+```
+
+Or add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rslife = "0.2.6"
+rslife = "0.2.7"
 ```
 
-### The Builder Pattern Advantage
+The crate is designed with three main layers to make actuarial computations convenient (more on [architecture from Wiki](https://github.com/hnlearndev/rslife/wiki/Architecture)), as illustrated below:
+
+```rust
+use rslife::prelude::*;
+
+fn main() -> RSLifeResult<()> {
+    // ========= FIRST LAYER - MORTALILITY DATA LOAD=========
+    // Load mortality data
+    // This seperation layer consists of multiple methods with flexibility at user hand to formulate the mortality or morbidity data
+    let data = MortData::from_ifoa_url_id("AM92")?;
+
+    // ========= SECOND LAYER - MORTALILITY TABLE CONFIGURATION =========
+    // Construct Mortality Table Config
+    // This layer is more rigid but still allows some configuration to mortality table
+    let mt = MortTableConfig::builder()
+      .data(data)
+      .radix(100_000) // Radix of 100k instead of default 10k
+      .pct(1.5) // 150% mortality rate instead of default 100%
+      .assumption(AssumptionEnum::CFM) // CFM assumption instead of default UDD assumtpion
+      .build()?;
+
+    // ========= THIRD LAYER - CALCULATIONS =========
+    // New builder pattern for actuarial calculations!
+    // This is the layer to perform calculation. Variables are only declared when needed - Consistent with actuarial notation principle.
+    let fractional_age_time_survival_rate = tpx()
+      .mt(&mt)
+      .x(35.5)
+      .t(5.8)
+      .entry_age(33)
+      .call()?;
+
+    let life_annuity = aax()
+      .mt(&mt)
+      .i(0.03)
+      .x(65)
+      .m(12) // monthly payable m=12
+      .call()?;
+
+    let deferred_term = Ax1n()
+      .mt(&mt_builder)
+      .i(0.03)
+      .x(35)
+      .n(15)
+      .t(5) // Deferred 5 years
+      .call()?;
+
+    Ok(())
+}
+```
+
+## Data sources - Layer 1 in zoom
+
+RSLife supports flexible mortality data input with automatic `qx`/`lx` detection.
+
+Detail guide can be found on project [wiki](https://github.com/hnlearndev/rslife/wiki)
+
+An example of parametric life table model
+
+```rust
+// Parametric life table model
+  let makeham_model_data = MortData::from_Makeham_law()
+    .A(0.00022)
+    .B(2.7e-6)
+    .C(1.124)
+    .start_age(20)
+    .call()?;
+```
+
+Life table can also be formulated from dataframe
+
+```rust
+// DataFrames - mortality rates or survivor functions
+// qx data
+let df_qx = df! {
+    "age" => [25_u32, 26, 27],
+    "qx" => [0.001_f64, 0.0012, 0.0015],
+}?;
+
+let data_from_df_with_qx = MortData::from_df(df_qx)?;
+
+// lx data
+let df_lx = df! {
+    "age" => [25_u32, 26.0, 27.0],
+    "lx" => [100000.0_f64, 99900.0, 99780.0],
+}?;
+
+let data_from_df_with_lx = MortData::from_df(df_lx)?;
+
+// Macro to directly form MortData
+// This is equivalent to forming dataframe then using from_df method
+let data_from_macro = mddf! {
+    "age" => [25_u32, 26, 27],
+    "qx" => [0.001_f64, 0.0012, 0.0015],
+}
+```
+
+There are various other methods to formulate life table. For examples, from spreadsheets
+
+```rust
+// Custom data from spreadsheet XLSX
+let data_from_xlsx = MortData::from_xlsx("data/mortality.xlsx", "select")?;
+
+// Custom data from spreadsheet ODS
+let data_from_ods = MortData::from_ods("data/mortality.ods", "select")?;
+```
+
+Direct ingestion from SOA or IFOA mortality and morbidity database
+
+```rust
+// ELT No.15 Female
+let data_from_soa = MortData::from_soa_url_id(1704)?;
+
+// AM92 Selected Mortality Table
+let data_from_ifoa = MortData::from_ifoa_url_id("AM92")?;
+```
+
+## The Builder Pattern Advantage
 
 - **🎯 Intentional**: Only specify parameters that matter for each calculation
 - **🔒 Safe**: Compile-time validation prevents parameter mistakes
 - **📖 Readable**: Self-documenting code that's easy to understand
 - **🔧 Maintainable**: Adding new parameters doesn't break existing code
 - **⚡ Efficient**: Automatic cross-field validation catches errors early
-
-```rust
-use rslife::prelude::*;
-
-fn main() -> RSLifeResult<()> {
-    // Load mortality data from SOA database (Society of Actuaries)
-    let soa_data = MortData::from_soa_url_id(1704)?;
-
-    // Load mortality data from IFOA database (Institute and Faculty of Actuaries)
-    let ifoa_data = MortData::from_ifoa_url_id("AM92")?;
-
-    // Most commonly known parametric life table model - This is in fact SULT from SOA
-    // Note: There are more direct method to call SULT built-in the crate though
-    let makeham_data = MortData:::from_Makeham_law()
-      .A(0.00022)
-      .B(2.7e-6)
-      .C(1.124)
-      .start_age(20)
-      .call()?;
-
-    // Construct Mortality Table Config
-    let mt_builder = MortTableConfig::builder()
-        .data(ifoa_data)
-        .radix(100_000) // Radix of 100k instead of default 10k
-        .pct(1.5) // 150% mortality rate instead of default 100%
-        .assumption(AssumptionEnum::CFM) // CFM assumption instead of default UDD assumtpion
-        .build()?;
-
-    // New builder pattern for actuarial calculations!
-    let fractional_age_time_survival_rate = tpx()
-        .mt(&mt)
-        .x(35.5)
-        .t(5.8)
-        .call()?;
-
-    let life_annuity = aax()
-        .mt(&mt)
-        .i(0.03)
-        .x(65)
-        .m(12) // monthly payable m=12
-        .call()?;
-
-    let deferred_term = Ax1n()
-        .mt(&mt_builder)
-        .i(0.03)
-        .x(35)
-        .n(15)
-        .t(5) // Deferred 5 years
-        .call()?;
-
-    Ok(())
-}
-```
 
 **vs. Traditional Approaches:**
 
@@ -130,60 +207,11 @@ let result = some_function(&config, 35, 0.03, 1, 0, 1, 1, Some(30))?;
 
 // ✅ RSLife: crystal clear, only specify what matters
 let result = Ax()
-    .mt(&config)
-    .i(0.03)
-    .x(35)
-    .entry_age(34)
-    .call()?;
-```
-
-### Custom Data Sources
-
-RSLife supports flexible mortality data input with automatic `qx`/`lx` detection.
-
-Beside several well-known parametric life table (Constant Force, Gomprtz, Makeham, Weibull, etc ...), users can even load the data directly from most trusted mortality database or use their own custom data under various methods.
-
-Details guide can be found on project [wiki](https://github.com/hnlearndev/rslife/wiki)
-
-```rust
-use polars::prelude::*;
-use rslife::prelude::*;
-
-// Parametric life table model
-  let makeham_model_data = MortData:::from_Makeham_law()
-    .A(0.00022)
-    .B(2.7e-6)
-    .C(1.124)
-    .start_age(20)
-    .call()?;
-
-// DataFrames - mortality rates or survivor functions
-let df_qx = df! {
-    "age" => [25_u32, 26, 27],
-    "qx" => [0.001_f64, 0.0012, 0.0015],
-}?;
-
-let df_lx = df! {
-    "age" => [25_u32, 26.0, 27.0],
-    "lx" => [100000.0_f64, 99900.0, 99780.0],
-}?;
-
-// Load data from various sources
-// Custom data from dataframe
-let data_from_df_with_qx = MortData::from_df(df_qx)?;
-let data_from_df_with_lx = MortData::from_df(df_lx)?;
-
-// Custom data from spreadsheet XLSX
-let data_from_xlsx = MortData::from_xlsx("data/mortality.xlsx", "select")?;
-
-// Custom data from spreadsheet ODS
-let data_from_ods = MortData::from_ods("data/mortality.ods", "select")?;
-
-// ELT No.15 Female
-let data_from_soa = MortData::from_soa_url_id(1704)?;
-
-// AM92 Selected Mortality Table
-let data_from_ifoa = MortData::from_ifoa_url_id("AM92")?;
+  .mt(&config)
+  .i(0.03)
+  .x(35)
+  .entry_age(34)
+  .call()?;
 ```
 
 ## Actuarial Functions & Naming Convention
@@ -192,8 +220,8 @@ let data_from_ifoa = MortData::from_ifoa_url_id("AM92")?;
 
 **Systematic Modifiers**:
 
-- **Immediate**: Single letter → `Ax`, `Axn` (payments at end of year)
-- **Due**: Double letter → `aax`, `aaxn` (payments at start of year)
+- **Immediate / In arrears**: Single letter → `Ax`, `Axn` (payments at end of year)
+- **Due / In advance**: Double letter → `aax`, `aaxn` (payments at start of year)
 - **Increasing**: `I` prefix → `IAx`, `Iaax` (arithmetic growth)
 - **Decreasing**: `D` prefix → `DAx1n`, `Daaxn` (arithmetic decrease)
 - **Geometric**: `g` prefix → `gAx`, `gaax` (geometric growth)
@@ -258,8 +286,6 @@ These examples will be updated when CM1  papers and examiners' report are publis
 
 SOA examination materials are also under consideration to be added as a re-testing medium in the near future.
 
-### Running Examples
-
 ```bash
 # Basic usage example
 cargo run --example basic_usage
@@ -309,3 +335,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - [MortalityTables.jl](https://github.com/JuliaActuary/MortalityTables.jl) - Julia package for mortality table calculations and life contingencies
 - [ActuaryUtilities.jl](https://github.com/JuliaActuary/ActuaryUtilities.jl) - Julia utilities for actuarial modeling and analysisk.
+
+## Enjoy?
+
+Let me know that you find the crate helpful. Thank you :D
+
+[![GitHub Sponsors](https://img.shields.io/github/sponsors/hnlearndev?color=red&logo=github&style=for-the-badge&label=GitHub%20Sponsors)](https://github.com/sponsors/hnlearndev)
+
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-☕-orange?style=for-the-badge&logo=buy-me-a-coffee)](https://buymeacoffee.com/hnlearndev)
