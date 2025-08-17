@@ -1,6 +1,6 @@
 [package]
 name = "rslife"
-version = "0.2.6"
+version = "0.2.7"
 edition = "2024"
 description = "A comprehensive Rust library for actuarial mortality table calculations and life insurance mathematics"
 license = "MIT"
@@ -19,7 +19,7 @@ reqwest = { version = "0.12.23", features = ["blocking"] }
 roxmltree = "0.20.0"
 spreadsheet-ods = "0.25.1"
 garde = { version = "0.22", features = ["derive"] }
-bon = "3.7.0"
+bon = "3.7.1"
 
 [dev-dependencies]
 approx = "0.5"
