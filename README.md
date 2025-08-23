@@ -342,4 +342,4 @@ Let me know that you find the crate helpful. Thank you :D
 
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/hnlearndev?color=red&logo=github&style=for-the-badge&label=GitHub%20Sponsors)](https://github.com/sponsors/hnlearndev)
 
-[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-☕-orange?style=for-the-badge&logo=buy-me-a-coffee)](https://github.com/sponsors/hnlearndev)
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-☕-orange?style=for-the-badge&logo=buy-me-a-coffee)](https://buymeacoffee.com/hnlearndev)
