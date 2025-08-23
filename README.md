@@ -122,7 +122,7 @@ Detail guide can be found on project [wiki](https://github.com/hnlearndev/rslife
 An example of parametric life table model
 
 ```rust
-// Parametric life table model
+// Parametric life table model - Makeham model μₓ = A + B·Cˣ
   let makeham_model_data = MortData::from_Makeham_law()
     .A(0.00022)
     .B(2.7e-6)
