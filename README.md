@@ -187,7 +187,7 @@ let data_from_ifoa = MortData::from_aus_gov_act("Male", "2020-22")?;
 
 ## The Builder Pattern Advantage - IMMERSE
 
-RSLife builder pattern let you IMMERSE yourselves in what truly matter for the core actuarial computation.
+RSLife builder pattern lets you IMMERSE yourselves in what truly matter for the core actuarial computation.
 
 - **🎯 Intentional**: Only specify parameters that matter for each calculation
 - **🗒️ Manageable**: Avoid clutter from declaring all parameters
