@@ -1,4 +1,5 @@
 use crate::RSLifeResult;
+use crate::mt_config::spreadsheet_helpers::{parse_excel_data, parse_excel_headers};
 use calamine::{Data, Reader, Xls, open_workbook_auto};
 use polars::prelude::*;
 use reqwest::blocking::get;
@@ -103,7 +104,7 @@ impl IFOAMortXLS {
             .ok_or("Invalid URL format, no sheet name found")?
             .to_uppercase();
         let id = id_owned.as_str();
-        let range = fetch_xls_range_from_url(url, id)?;
+        let range = fetch_range_from_url(url, id)?;
         data_process(1, range)
     }
 
@@ -138,7 +139,7 @@ impl IFOAMortXLS {
             _ => return Err(format!("{id} is not supported").into()),
         };
 
-        let range = fetch_xls_range_from_url(&url, id)?;
+        let range = fetch_range_from_url(&url, id)?;
         data_process(structure, range)
     }
 
@@ -156,7 +157,7 @@ impl IFOAMortXLS {
             _ => return Err(format!("{id} is not supported").into()),
         };
 
-        let range = fetch_xls_range_from_url(&url, sheet_name)?;
+        let range = fetch_range_from_url(&url, sheet_name)?;
         data_process(structure, range)
     }
 }
@@ -183,11 +184,11 @@ fn data_process(structure: u32, range: calamine::Range<Data>) -> RSLifeResult<IF
 
 fn data_process_01(range: calamine::Range<Data>) -> RSLifeResult<(String, DataFrame)> {
     // Extract description and headers
-    let description = extract_xls_description(&range).unwrap_or_default();
-    let headers = extract_xls_headers(&range);
+    let description = extract_description(&range).unwrap_or_default();
+    let headers = extract_headers(&range);
 
     let ncols = headers.len();
-    let columns = parse_xls_data(&range, ncols)?;
+    let columns = parse_excel_data(&range, 4, ncols)?;
 
     // The first column is age, the rest are durations
     let age_col = &columns[0];
@@ -296,7 +297,7 @@ fn get_info_from_id(id: &str) -> RSLifeResult<(u32, &str)> {
 
 //---------------------------------------------------------------------
 
-/// 0. Get the number of sheets in url provided
+///// 0. Get the number of sheets in url provided
 // fn get_number_of_sheets(url: &str) -> Result<usize, Box<dyn Error>> {
 //     let response = get(url)?;
 //     let bytes = response.bytes()?;
@@ -304,8 +305,9 @@ fn get_info_from_id(id: &str) -> RSLifeResult<(u32, &str)> {
 //     let sheet_count = workbook.sheet_names().len();
 //     Ok(sheet_count)
 // }
+
 /// 1. Retrieve the data from a URL and return the calamine::Range<Data> for the first sheet
-fn fetch_xls_range_from_url(url: &str, sheet_name: &str) -> RSLifeResult<calamine::Range<Data>> {
+fn fetch_range_from_url(url: &str, sheet_name: &str) -> RSLifeResult<calamine::Range<Data>> {
     let response = get(url)?;
     let bytes = response.bytes()?;
     let mut workbook = Xls::new(Cursor::new(bytes))?;
@@ -318,7 +320,7 @@ fn fetch_xls_range_from_url(url: &str, sheet_name: &str) -> RSLifeResult<calamin
 }
 
 /// 2. Process the description (cell A1)
-fn extract_xls_description(range: &calamine::Range<Data>) -> Option<String> {
+fn extract_description(range: &calamine::Range<Data>) -> Option<String> {
     range.get((0, 0)).and_then(|cell| match cell {
         Data::String(s) => Some(s.trim().to_string()),
         Data::Empty => None,
@@ -327,18 +329,10 @@ fn extract_xls_description(range: &calamine::Range<Data>) -> Option<String> {
 }
 
 /// 3. Process the header (row 3, parse until first blank)
-fn extract_xls_headers(range: &calamine::Range<Data>) -> Vec<String> {
-    let mut headers = Vec::new();
-    let mut col = 0;
-    loop {
-        let cell = range.get((2, col)); // Row 3 (0-based)
-        match cell {
-            Some(Data::String(s)) if !s.trim().is_empty() => headers.push(s.trim().to_string()),
-            Some(Data::Empty) | None => break,
-            Some(other) => headers.push(other.to_string()),
-        }
-        col += 1;
-    }
+fn extract_headers(range: &calamine::Range<Data>) -> Vec<String> {
+    // Extract raw headers first
+    let headers = parse_excel_headers(range, 2).unwrap_or_default();
+
     // Process headers: convert to canonical form
     headers
         .into_iter()
@@ -362,59 +356,6 @@ fn extract_xls_headers(range: &calamine::Range<Data>) -> Vec<String> {
             }
         })
         .collect()
-}
-
-/// 4. Process the data into a Vec<Vec<f64>> using parse_xls_f64_cell, starting at row 5 (0-based index 4)
-fn parse_xls_data(range: &calamine::Range<Data>, ncols: usize) -> RSLifeResult<Vec<Vec<f64>>> {
-    let mut columns: Vec<Vec<f64>> = vec![Vec::new(); ncols];
-    let mut row_num = 4; // Start at row 5 (0-based)
-    loop {
-        let mut empty_row = true;
-        for (col, column) in columns.iter_mut().enumerate().take(ncols) {
-            let cell = range.get((row_num, col));
-            let val = match _parse_xls_f64_cell(cell, row_num + 1, &format!("col{col}")) {
-                Ok(v) => v,
-                Err(_) => f64::NAN,
-            };
-            if !val.is_nan() {
-                empty_row = false;
-            }
-            column.push(val);
-        }
-
-        if empty_row {
-            // Remove the last pushed NaNs for this empty row
-            for column in columns.iter_mut().take(ncols) {
-                column.pop();
-            }
-            break;
-        }
-        row_num += 1;
-    }
-    Ok(columns)
-}
-
-/// Like parse_xlsx_f64_cell, but for xls (calamine::Data)
-fn _parse_xls_f64_cell(cell: Option<&Data>, row_num: usize, col_name: &str) -> RSLifeResult<f64> {
-    match cell {
-        Some(Data::Float(f)) => Ok(*f),
-        Some(Data::Int(v)) => Ok(*v as f64),
-        Some(Data::String(s)) => {
-            if s.trim().is_empty() {
-                Ok(f64::NAN)
-            } else {
-                s.parse::<f64>().map_err(|_| {
-                    format!("Cannot parse {col_name} '{s}' at row {row_num} as number").into()
-                })
-            }
-        }
-        Some(Data::Bool(b)) => Ok(if *b { 1.0 } else { 0.0 }),
-        Some(Data::Empty) => Ok(f64::NAN),
-        Some(other) => {
-            Err(format!("Invalid {col_name} cell type {other:?} at row {row_num}").into())
-        }
-        None => Err(format!("Missing {col_name} cell at row {row_num}").into()),
-    }
 }
 
 // ================================================

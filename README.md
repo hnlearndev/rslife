@@ -1,13 +1,18 @@
 <h1 align="center">
-  <a href="https://crates.io/crates/rslife">
-    <img src="https://raw.githubusercontent.com/hnlearndev/static/refs/heads/init/rslife/banner/banner.svg" alt="RSLife logo">
-  </a>
+
+  [![RSLife logo](https://raw.githubusercontent.com/hnlearndev/static/refs/heads/init/rslife/banner/banner.svg)](https://crates.io/crates/rslife)
+
 </h1>
 
 <div align="center">
-  <a href="https://crates.io/crates/rslife"><img src="https://img.shields.io/crates/v/rslife.svg" alt="crates.io Latest Release"/></a>
-  <a href="https://docs.rs/rslife/latest/rslife/"><img src="https://docs.rs/rslife/badge.svg" alt="Documentation"/></a>
-  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"/></a>
+
+[![crates.io Latest Release](https://img.shields.io/crates/v/rslife.svg)](https://crates.io/crates/rslife)
+[![Documentation](https://docs.rs/rslife/badge.svg)](https://docs.rs/rslife/latest/rslife/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE-MIT)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-yellow.svg)](./LICENSE-APACHE)
+
+![Crates.io Total Downloads](https://img.shields.io/crates/d/rslife?style=social)
+
 </div>
 
 ---
@@ -102,10 +107,11 @@ fn main() -> RSLifeResult<()> {
       .call()?;
 
     let deferred_term = Ax1n()
-      .mt(&mt_builder)
+      .mt(&mt)
       .i(0.03)
       .x(35)
       .n(15)
+      .entry_age(34) // Entry age for selected effect - duration
       .t(5) // Deferred 5 years
       .call()?;
 
@@ -123,12 +129,12 @@ An example of parametric life table model
 
 ```rust
 // Parametric life table model
-  let makeham_model_data = MortData::from_Makeham_law()
-    .A(0.00022)
-    .B(2.7e-6)
-    .C(1.124)
-    .start_age(20)
-    .call()?;
+let makeham_model_data = MortData::from_Makeham_law()
+  .A(0.00022)
+  .B(2.7e-6)
+  .C(1.124)
+  .start_age(20)
+  .call()?;
 ```
 
 Life table can also be formulated from dataframe
@@ -169,7 +175,9 @@ let data_from_xlsx = MortData::from_xlsx("data/mortality.xlsx", "select")?;
 let data_from_ods = MortData::from_ods("data/mortality.ods", "select")?;
 ```
 
-Direct ingestion from SOA or IFOA mortality and morbidity database
+Direct ingestion from SOA, IFOA and Australian Government Actuary mortality and morbidity database
+
+More direct API are coming in the next releases. Please feel free to suggest your favorite database.
 
 ```rust
 // ELT No.15 Female
@@ -177,15 +185,22 @@ let data_from_soa = MortData::from_soa_url_id(1704)?;
 
 // AM92 Selected Mortality Table
 let data_from_ifoa = MortData::from_ifoa_url_id("AM92")?;
+
+// Male mortality rate in 2020-2022
+let data_from_aga = MortData::from_aus_gov_act("Male", "2020-22")?;
 ```
 
-## The Builder Pattern Advantage
+## The Builder Pattern Advantage - IMMERSE
+
+RSLife builder pattern let you IMMERSE yourselves in what truly matter for the core actuarial computation.
 
 - **🎯 Intentional**: Only specify parameters that matter for each calculation
-- **🔒 Safe**: Compile-time validation prevents parameter mistakes
-- **📖 Readable**: Self-documenting code that's easy to understand
+- **🗒️ Manageable**: Avoid clutter from declaring all parameters
 - **🔧 Maintainable**: Adding new parameters doesn't break existing code
 - **⚡ Efficient**: Automatic cross-field validation catches errors early
+- **📖 Readable**: Self-documenting code that's easy to understand
+- **🔒 Safe**: Compile-time validation prevents parameter mistakes
+- **🧁 Effortless**: Capable to construct complex calculations with minial code
 
 **vs. Traditional Approaches:**
 
@@ -302,7 +317,11 @@ For major changes, please open an issue first to discuss what you would like to 
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is dual-licensed under the Apache License, Version 2.0 and the MIT License.
+
+You may choose either license when using this code.
+
+See [LICENSE-APACHE](LICENSE-APACHE) and [LICENSE-MIT.md](LICENSE-MIT.md) for details.
 
 ## Contact
 
@@ -342,4 +361,4 @@ Let me know that you find the crate helpful. Thank you :D
 
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/hnlearndev?color=red&logo=github&style=for-the-badge&label=GitHub%20Sponsors)](https://github.com/sponsors/hnlearndev)
 
-[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-☕-orange?style=for-the-badge&logo=buy-me-a-coffee)](https://buymeacoffee.com/hnlearndev)
+[![Buy me a coffee](https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=☕&slug=hnlearndev&button_colour=b5835a&font_colour=000000&font_family=Lato&outline_colour=000000&coffee_colour=FFDD00)](https://www.buymeacoffee.com/hnlearndev)

@@ -36,9 +36,11 @@
 #![allow(non_snake_case)]
 
 // Create a structure for the module
+mod aga_xls;
 mod ifoa_xls;
 pub mod mt_data;
 mod soa_xml;
+mod spreadsheet_helpers;
 
 // Declare the module for MortData
 use self::mt_data::MortData;
