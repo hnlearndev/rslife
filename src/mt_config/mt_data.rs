@@ -1,10 +1,12 @@
+use super::aga_xls::AusGovActMortXLS;
 use super::ifoa_xls::IFOAMortXLS;
 use super::soa_xml::SOAMortXML;
 use crate::RSLifeResult;
+use crate::mt_config::spreadsheet_helpers::*;
 use bon::bon;
-use calamine::{Data, Reader, open_workbook_auto};
+use calamine::{Reader, open_workbook_auto};
 use polars::prelude::*;
-use spreadsheet_ods::{Value, read_ods};
+use spreadsheet_ods::read_ods;
 use std::fs;
 
 #[derive(Debug, Clone)]
@@ -624,6 +626,45 @@ impl MortData {
     }
 
     // ========================================================
+    // AUSTRALIAN GOVERNMENT ACTUARY  XLS  PARSING
+    // ========================================================
+    /// Parse mortality table from Australian Government Actuary XLS URL.
+    ///
+    /// Downloads and parses mortality table data directly from the Australian Government Actuary (AGA) website. This method makes an HTTP GET request to fetch XLS data, parses the file, and constructs a validated mortality table.
+    ///
+    /// The method requires specifying the gender and period for the table, which are used to construct the correct URL and select the appropriate sheet/data. The returned `MortData` is validated for schema and content.
+    ///
+    /// # Parameters
+    /// - `gender`: Gender for the mortality table (e.g., "male", "female").
+    /// - `period`: Period or year for the mortality table (e.g., "2015-17").
+    ///
+    /// # Errors
+    /// - Network connectivity issues
+    /// - HTTP request failures (4xx, 5xx status codes)
+    /// - Invalid or unreachable URL
+    /// - Invalid gender or period (sheet not found)
+    /// - XLS parsing errors
+    /// - Schema validation errors (via `new()`)
+    ///
+    /// # Examples
+    /// ```rust, ignore
+    /// # use rslife::prelude::*;
+    /// // Download AGA mortality table for males, 2015-17 period
+    /// let mort_data = MortData::from_aus_gov_act_url("male", "2015-17")?;
+    /// println!("Downloaded: {}", mort_data.category);
+    /// # RSLifeResult::Ok(())
+    /// ```
+    pub fn from_aus_gov_act(gender: &str, period: &str) -> RSLifeResult<Self> {
+        let data = AusGovActMortXLS::from_url(gender, period)?;
+        let result = Self::new(
+            "Australian Government Actuarial Mortality Data".to_string(),
+            data.description,
+            data.dataframe,
+        )?;
+        Ok(result)
+    }
+
+    // ========================================================
     // OTHER PARSING METHODS
     // ========================================================
     /// Create mortality table from existing Polars DataFrame.
@@ -711,50 +752,30 @@ impl MortData {
 
         let sheet = sheet.ok_or_else(|| format!("Sheet '{sheet_name}' not found in ODS file"))?;
 
-        // Get sheet dimensions
-        let (max_row, max_col) = sheet.used_grid_size();
-
         // Check if sheet is empty
+        let (max_row, _) = sheet.used_grid_size();
         if max_row < 1 {
             return Err(format!("Sheet '{sheet_name}' is empty").into());
         }
 
-        // Extract headers from first row
-        let mut column_names = Vec::new();
-        for col in 0..=max_col {
-            let cell_value = sheet.value(0, col);
-            let col_name = extract_ods_header_name(cell_value, &format!("Column {}", col + 1))?;
-            column_names.push(col_name);
-        }
+        // Parse headers
+        let headers = parse_ods_headers(sheet, 0)?;
 
-        // Parse data rows based on column names
-        let mut column_data: Vec<Vec<AnyValue>> = vec![Vec::new(); column_names.len()];
-
-        for row in 1..=max_row {
-            let row_num = (row + 1) as usize; // 1-based for user-friendly error messages
-
-            for (col_idx, col_name) in column_names.iter().enumerate() {
-                let cell_value = sheet.value(row, col_idx as u32);
-                // Parse as f64 for all other columns (tqx, lx, etc.)
-                let val = parse_ods_f64_cell(cell_value, row_num, col_name)?;
-                let any_value = AnyValue::Float64(val);
-                column_data[col_idx].push(any_value);
-            }
-        }
+        // Extract all the data
+        let data_cols = parse_ods_data(sheet, 1, headers.len())?;
 
         // Validate that we have data
-        if column_data.is_empty() || column_data[0].is_empty() {
+        if data_cols.is_empty() || data_cols[0].is_empty() {
             return Err("No data rows found in sheet".into());
         }
 
         // Build DataFrame
         let mut columns = Vec::new();
-        for (col_name, data) in column_names.iter().zip(column_data.iter()) {
-            let series = Series::from_any_values(col_name.as_str().into(), data, true)
-                .map_err(|e| format!("Failed to create series for column '{col_name}': {e}"))?;
+        for (col_name, data_col) in headers.iter().zip(data_cols.iter()) {
+            // Build Series directly as f64
+            let series = Series::from_vec(col_name.into(), data_col.clone());
             columns.push(series.into_column());
         }
-
         let df = DataFrame::new(columns).map_err(|e| format!("Failed to create DataFrame: {e}"))?;
 
         // Create MortData with a default category
@@ -795,6 +816,7 @@ impl MortData {
         let mut workbook = open_workbook_auto(xlsx_file_path_str)
             .map_err(|e| format!("Failed to open XLSX file '{xlsx_file_path_str}': {e}"))?;
 
+        // Identify range
         let range = workbook
             .worksheet_range(sheet_name)
             .map_err(|e| format!("Failed to read sheet '{sheet_name}': {e}"))?;
@@ -804,50 +826,24 @@ impl MortData {
             return Err(format!("Sheet '{sheet_name}' is empty").into());
         }
 
-        let rows: Vec<_> = range.rows().collect();
-        if rows.len() < 2 {
-            return Err("Sheet must contain at least a header row and one data row".into());
-        }
-
         // Extract headers
-        let header_row = &rows[0];
-        if header_row.is_empty() {
-            return Err("Header row is empty".into());
-        }
+        let headers = parse_excel_headers(&range, 0)?;
 
-        let mut column_names = Vec::new();
-        for (i, cell) in header_row.iter().enumerate() {
-            let col_name = extract_xlsx_header_name(Some(cell), &format!("Column {}", i + 1))?;
-            column_names.push(col_name);
-        }
-
-        // Parse data rows based on column names
-        let mut column_data: Vec<Vec<AnyValue>> = vec![Vec::new(); column_names.len()];
-
-        for (i, row) in rows.iter().enumerate().skip(1) {
-            let row_num = i + 1; // 1-based for user-friendly error messages
-
-            for (col_idx, (cell, col_name)) in row.iter().zip(column_names.iter()).enumerate() {
-                // Parse as f64 for all other columns (tqx, lx, etc.)
-                let val = parse_xlsx_f64_cell(Some(cell), row_num, col_name)?;
-                let any_value = AnyValue::Float64(val);
-                column_data[col_idx].push(any_value);
-            }
-        }
+        // Extract all the data
+        let data_cols = parse_excel_data(&range, 1, headers.len())?;
 
         // Validate that we have data
-        if column_data.is_empty() || column_data[0].is_empty() {
+        if data_cols.is_empty() || data_cols[0].is_empty() {
             return Err("No data rows found in sheet".into());
         }
 
         // Build DataFrame
         let mut columns = Vec::new();
-        for (col_name, data) in column_names.iter().zip(column_data.iter()) {
-            let series = Series::from_any_values(col_name.as_str().into(), data, true)
-                .map_err(|e| format!("Failed to create series for column '{col_name}': {e}"))?;
+        for (col_name, data_col) in headers.iter().zip(data_cols.iter()) {
+            // Build Series directly as f64
+            let series = Series::from_vec(col_name.into(), data_col.clone());
             columns.push(series.into_column());
         }
-
         let df = DataFrame::new(columns).map_err(|e| format!("Failed to create DataFrame: {e}"))?;
 
         // Create MortData with a default category
@@ -1063,66 +1059,6 @@ fn setup_dataframe_to_correct_schema(df: DataFrame) -> PolarsResult<DataFrame> {
     }
 
     Ok(df)
-}
-
-/// Extract header name from ODS cell value, ensuring it's a string.
-fn extract_ods_header_name(cell_value: &Value, column_desc: &str) -> RSLifeResult<String> {
-    match cell_value {
-        Value::Text(s) => Ok(s.trim().to_lowercase()),
-        Value::Empty => Err(format!("{column_desc} header is missing").into()),
-        other => Err(format!("{column_desc} header must be text, found {other:?}").into()),
-    }
-}
-
-/// Parse ODS cell value as f64 with comprehensive error handling.
-fn parse_ods_f64_cell(cell_value: &Value, row_num: usize, col_name: &str) -> RSLifeResult<f64> {
-    match cell_value {
-        Value::Number(f) => Ok(*f),
-        Value::Text(s) => {
-            if s.trim().is_empty() {
-                Ok(f64::NAN)
-            } else {
-                s.parse::<f64>().map_err(|_| {
-                    format!("Cannot parse {col_name} '{s}' at row {row_num} as number").into()
-                })
-            }
-        }
-        // Bool type not supported in this version of spreadsheet-ods
-        Value::Empty => Ok(f64::NAN),
-        other => Err(format!("Invalid {col_name} cell type {other:?} at row {row_num}").into()),
-    }
-}
-
-/// Extract header name from cell, ensuring it's a string value.
-fn extract_xlsx_header_name(cell: Option<&Data>, column_desc: &str) -> RSLifeResult<String> {
-    match cell {
-        Some(Data::String(s)) => Ok(s.trim().to_lowercase()),
-        Some(other) => Err(format!("{column_desc} header must be text, found {other:?}").into()),
-        None => Err(format!("{column_desc} header is missing").into()),
-    }
-}
-
-/// Parse cell value as f64 with comprehensive error handling.
-fn parse_xlsx_f64_cell(cell: Option<&Data>, row_num: usize, col_name: &str) -> RSLifeResult<f64> {
-    match cell {
-        Some(Data::Float(f)) => Ok(*f),
-        Some(Data::Int(v)) => Ok(*v as f64),
-        Some(Data::String(s)) => {
-            if s.trim().is_empty() {
-                Ok(f64::NAN)
-            } else {
-                s.parse::<f64>().map_err(|_| {
-                    format!("Cannot parse {col_name} '{s}' at row {row_num} as number").into()
-                })
-            }
-        }
-        Some(Data::Bool(b)) => Ok(if *b { 1.0 } else { 0.0 }),
-        Some(Data::Empty) => Ok(f64::NAN),
-        Some(other) => {
-            Err(format!("Invalid {col_name} cell type {other:?} at row {row_num}").into())
-        }
-        None => Err(format!("Missing {col_name} cell at row {row_num}").into()),
-    }
 }
 
 // ================================================

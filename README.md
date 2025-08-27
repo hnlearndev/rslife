@@ -123,12 +123,12 @@ An example of parametric life table model
 
 ```rust
 // Parametric life table model
-  let makeham_model_data = MortData::from_Makeham_law()
-    .A(0.00022)
-    .B(2.7e-6)
-    .C(1.124)
-    .start_age(20)
-    .call()?;
+let makeham_model_data = MortData::from_Makeham_law()
+  .A(0.00022)
+  .B(2.7e-6)
+  .C(1.124)
+  .start_age(20)
+  .call()?;
 ```
 
 Life table can also be formulated from dataframe
@@ -169,7 +169,9 @@ let data_from_xlsx = MortData::from_xlsx("data/mortality.xlsx", "select")?;
 let data_from_ods = MortData::from_ods("data/mortality.ods", "select")?;
 ```
 
-Direct ingestion from SOA or IFOA mortality and morbidity database
+Direct ingestion from SOA, IFOA and Australian Government Actuary mortality and morbidity database
+
+More direct API are coming in the next releases. Please feel free to suggest your favorite database.
 
 ```rust
 // ELT No.15 Female
@@ -177,15 +179,22 @@ let data_from_soa = MortData::from_soa_url_id(1704)?;
 
 // AM92 Selected Mortality Table
 let data_from_ifoa = MortData::from_ifoa_url_id("AM92")?;
+
+// Male mortality rate in 2020-2022
+let data_from_ifoa = MortData::from_aus_gov_act("Male", "2020-22")?;
 ```
 
-## The Builder Pattern Advantage
+## The Builder Pattern Advantage - IMMERSE
+
+RSLife builder pattern let you IMMERSE yourselves in what truly matter for the core actuarial computation.
 
 - **🎯 Intentional**: Only specify parameters that matter for each calculation
-- **🔒 Safe**: Compile-time validation prevents parameter mistakes
-- **📖 Readable**: Self-documenting code that's easy to understand
+- **🗒️ Manageable**: Avoid clutter from declaring all parameters
 - **🔧 Maintainable**: Adding new parameters doesn't break existing code
 - **⚡ Efficient**: Automatic cross-field validation catches errors early
+- **📖 Readable**: Self-documenting code that's easy to understand
+- **🔒 Safe**: Compile-time validation prevents parameter mistakes
+- **🧁 Effortless**: Capable to construct complex calculations with minial code
 
 **vs. Traditional Approaches:**
 
