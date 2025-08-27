@@ -102,10 +102,11 @@ fn main() -> RSLifeResult<()> {
       .call()?;
 
     let deferred_term = Ax1n()
-      .mt(&mt_builder)
+      .mt(&mt)
       .i(0.03)
       .x(35)
       .n(15)
+      .entry_age(34) // Entry age for selected effect - duration
       .t(5) // Deferred 5 years
       .call()?;
 
