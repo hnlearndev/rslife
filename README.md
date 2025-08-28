@@ -182,7 +182,7 @@ let data_from_soa = MortData::from_soa_url_id(1704)?;
 let data_from_ifoa = MortData::from_ifoa_url_id("AM92")?;
 
 // Male mortality rate in 2020-2022
-let data_from_ifoa = MortData::from_aus_gov_act("Male", "2020-22")?;
+let data_from_aga = MortData::from_aus_gov_act("Male", "2020-22")?;
 ```
 
 ## The Builder Pattern Advantage - IMMERSE
