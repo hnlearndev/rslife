@@ -60,7 +60,7 @@ Or add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rslife = "0.2.7"
+rslife = "0.2.8"
 ```
 
 The crate is designed with three main layers to make actuarial computations convenient (more on [architecture from Wiki](https://github.com/hnlearndev/rslife/wiki/Architecture)), as illustrated below:
