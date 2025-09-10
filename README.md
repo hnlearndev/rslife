@@ -9,7 +9,7 @@
 [![crates.io Latest Release](https://img.shields.io/crates/v/rslife.svg)](https://crates.io/crates/rslife)
 [![Documentation](https://docs.rs/rslife/badge.svg)](https://docs.rs/rslife/latest/rslife/)
 [![codecov](https://img.shields.io/codecov/c/github/hnlearndev/rslife?logo=codecov&label=coverage)](https://app.codecov.io/gh/hnlearndev/rslife)
-[![codspeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://codspeed.io/nautechsystems/nautilus_trader)
+[![Performance](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json?org=hnlearndev&repo=rslife&label=performance)](https://codspeed.io/hnlearndev/rslife)
 
 ![Crates.io Total Downloads](https://img.shields.io/crates/d/rslife?style=social)
 
