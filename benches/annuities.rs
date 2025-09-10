@@ -22,7 +22,7 @@ fn setup_pma92c20_table() -> MortTableConfig {
 fn bench_life_annuities_due(c: &mut Criterion) {
     let mt = setup_am92_table();
     let interest_rate = 0.04;
- 
+
     // Life annuity-due (aax)
     c.bench_function("aax_life_annuity_due_age_30", |b| {
         b.iter(|| aax().mt(&mt).i(interest_rate).x(30).call().unwrap())
