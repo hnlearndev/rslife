@@ -4,7 +4,7 @@ on:
   # Run on pushes to main branch
   push:
     branches: [ main ]
-  
+
   # Run on pull requests to main branch
   pull_request:
     branches: [ main ]
@@ -46,7 +46,8 @@ jobs:
         uses: CodSpeedHQ/action@v3
         with:
           run: cargo bench --bench commutations --bench mortality_functions --bench annuities
-          token: ${{ secrets.CODSPEED_TOKEN }}
+        env:
+          CODSPEED_CARGO_WORKSPACE_ROOT: ${{ github.workspace }}
 
       - name: Upload benchmark results
         if: github.event_name == 'pull_request'
