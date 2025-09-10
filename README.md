@@ -1,6 +1,6 @@
 <h1 align="center">
 
-[![RSLife logo](https://raw.githubusercontent.com/hnlearndev/static/refs/heads/init/rslife/banner/banner.svg)](https://crates.io/crates/rslife)
+[![RSLife logo](https://raw.githubusercontent.com/hnlearndev/static/refs/heads/main/rslife/banner/banner.svg)](https://crates.io/crates/rslife)
 
 </h1>
 
