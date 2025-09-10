@@ -1,6 +1,6 @@
 <h1 align="center">
 
-  [![RSLife logo](https://raw.githubusercontent.com/hnlearndev/static/refs/heads/init/rslife/banner/banner.svg)](https://crates.io/crates/rslife)
+[![RSLife logo](https://raw.githubusercontent.com/hnlearndev/static/refs/heads/init/rslife/banner/banner.svg)](https://crates.io/crates/rslife)
 
 </h1>
 
@@ -11,10 +11,13 @@
 [![codecov](https://img.shields.io/codecov/c/github/hnlearndev/rslife?logo=codecov&label=coverage)](https://app.codecov.io/gh/hnlearndev/rslife)
 [![codspeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://codspeed.io/nautechsystems/nautilus_trader)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE-MIT)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-yellow.svg)](./LICENSE-APACHE)
-
 ![Crates.io Total Downloads](https://img.shields.io/crates/d/rslife?style=social)
+
+| Rust Version | Build Status | Test Status |
+|:------------:|:------------:|:-----------:|
+| **Stable**   | [![Build Status - Stable](https://img.shields.io/github/actions/workflow/status/hnlearndev/rslife/rust-stable.yml?branch=main&label=build&style=flat-square)](https://github.com/hnlearndev/rslife/actions/workflows/rust-stable.yml) | [![Test Status - Stable](https://img.shields.io/github/actions/workflow/status/hnlearndev/rslife/rust-stable.yml?branch=main&label=tests&style=flat-square)](https://github.com/hnlearndev/rslife/actions/workflows/rust-stable.yml) |
+| **1.89.0**   | [![Build Status - 1.89.0](https://img.shields.io/github/actions/workflow/status/hnlearndev/rslife/rust-1.89.0.yml?branch=main&label=build&style=flat-square)](https://github.com/hnlearndev/rslife/actions/workflows/rust-1.89.0.yml) | [![Test Status - 1.89.0](https://img.shields.io/github/actions/workflow/status/hnlearndev/rslife/rust-1.89.0.yml?branch=main&label=tests&style=flat-square)](https://github.com/hnlearndev/rslife/actions/workflows/rust-1.89.0.yml) |
+| **Nightly**  | [![Build Status - Nightly](https://img.shields.io/github/actions/workflow/status/hnlearndev/rslife/rust-nightly.yml?branch=main&label=build&style=flat-square)](https://github.com/hnlearndev/rslife/actions/workflows/rust-nightly.yml) | [![Test Status - Nightly](https://img.shields.io/github/actions/workflow/status/hnlearndev/rslife/rust-nightly.yml?branch=main&label=tests&style=flat-square)](https://github.com/hnlearndev/rslife/actions/workflows/rust-nightly.yml) |
 
 </div>
 
@@ -68,7 +71,7 @@ Or add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rslife = "0.2.9"
+rslife = "0.2.8"
 ```
 
 The crate is designed with three main layers to make actuarial computations convenient (more on [architecture from Wiki](https://github.com/hnlearndev/rslife/wiki/Architecture)), as illustrated below:
@@ -324,7 +327,7 @@ This project is dual-licensed under the Apache License, Version 2.0 and the MIT 
 
 You may choose either license when using this code.
 
-See [LICENSE-APACHE](LICENSE-APACHE) and [LICENSE-MIT.md](LICENSE-MIT.md) for details.
+See [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-yellow.svg)](./LICENSE-APACHE) and [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE-MIT) for details.
 
 ## Contact
 

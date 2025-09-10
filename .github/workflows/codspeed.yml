@@ -1,0 +1,56 @@
+name: CodSpeed
+
+on:
+  # Run on pushes to main branch
+  push:
+    branches: [ main ]
+  
+  # Run on pull requests to main branch
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  benchmarks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev pkg-config
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-bench-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-bench-
+            ${{ runner.os }}-cargo-
+
+      - name: Build project
+        run: cargo build --release
+
+      - name: Run benchmarks
+        uses: CodSpeedHQ/action@v3
+        with:
+          run: cargo bench --bench commutations --bench mortality_functions --bench annuities
+          token: ${{ secrets.CODSPEED_TOKEN }}
+
+      - name: Upload benchmark results
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: target/criterion/

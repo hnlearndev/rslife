@@ -1,4 +1,4 @@
-name: Rust CI (All Versions)
+name: Rust Nightly CI
 
 on:
   push:
@@ -7,19 +7,9 @@ on:
     branches: [ main ]
 
 jobs:
-  # This workflow orchestrates all Rust version checks
-  # Individual version badges can be found in separate workflow files
-  all-rust-versions:
+  build-and-test-nightly:
     runs-on: ubuntu-latest
-    needs: []
-    strategy:
-      fail-fast: false
-      matrix:
-        rust: [stable, '1.89.0', nightly]
-        include:
-          - rust: nightly
-            allow-failure: true
-    continue-on-error: ${{ matrix.allow-failure || false }}
+    continue-on-error: true  # Allow nightly builds to fail without failing the entire workflow
 
     steps:
       - name: Install system dependencies
@@ -28,10 +18,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Rust ${{ matrix.rust }}
-        uses: dtolnay/rust-toolchain@master
+      - name: Set up Rust Nightly
+        uses: dtolnay/rust-toolchain@nightly
         with:
-          toolchain: ${{ matrix.rust }}
           components: rustfmt, clippy
 
       - name: Build

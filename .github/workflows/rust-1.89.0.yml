@@ -1,4 +1,4 @@
-name: Rust CI (All Versions)
+name: Rust 1.89.0 CI
 
 on:
   push:
@@ -7,19 +7,8 @@ on:
     branches: [ main ]
 
 jobs:
-  # This workflow orchestrates all Rust version checks
-  # Individual version badges can be found in separate workflow files
-  all-rust-versions:
+  build-and-test-1-89-0:
     runs-on: ubuntu-latest
-    needs: []
-    strategy:
-      fail-fast: false
-      matrix:
-        rust: [stable, '1.89.0', nightly]
-        include:
-          - rust: nightly
-            allow-failure: true
-    continue-on-error: ${{ matrix.allow-failure || false }}
 
     steps:
       - name: Install system dependencies
@@ -28,10 +17,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Rust ${{ matrix.rust }}
+      - name: Set up Rust 1.89.0
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ matrix.rust }}
+          toolchain: '1.89.0'
           components: rustfmt, clippy
 
       - name: Build
