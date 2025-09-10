@@ -126,6 +126,7 @@ impl IFOAMortXLS {
         let structure = info_from_id.0;
         let url_suffix = info_from_id.1;
 
+        // TODO: url now also get from ONS not just IFOA
         let url = format!("https://www.actuaries.org.uk/documents/{url_suffix}");
 
         let id = match structure {

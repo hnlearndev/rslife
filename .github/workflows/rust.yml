@@ -9,6 +9,14 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rust: [stable, '1.89.0', nightly]
+        include:
+          - rust: nightly
+            allow-failure: true
+    continue-on-error: ${{ matrix.allow-failure || false }}
 
     steps:
       - name: Install system dependencies
@@ -17,10 +25,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
+      - name: Set up Rust ${{ matrix.rust }}
+        uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: '1.89.0'
+          toolchain: ${{ matrix.rust }}
+          components: rustfmt, clippy
 
       - name: Build
         run: cargo build --verbose

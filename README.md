@@ -8,6 +8,9 @@
 
 [![crates.io Latest Release](https://img.shields.io/crates/v/rslife.svg)](https://crates.io/crates/rslife)
 [![Documentation](https://docs.rs/rslife/badge.svg)](https://docs.rs/rslife/latest/rslife/)
+[![codecov](https://img.shields.io/codecov/c/github/hnlearndev/rslife?logo=codecov&label=coverage)](https://app.codecov.io/gh/hnlearndev/rslife)
+[![codspeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://codspeed.io/nautechsystems/nautilus_trader)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE-MIT)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-yellow.svg)](./LICENSE-APACHE)
 
@@ -65,7 +68,7 @@ Or add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rslife = "0.2.7"
+rslife = "0.2.9"
 ```
 
 The crate is designed with three main layers to make actuarial computations convenient (more on [architecture from Wiki](https://github.com/hnlearndev/rslife/wiki/Architecture)), as illustrated below:
@@ -327,7 +330,7 @@ See [LICENSE-APACHE](LICENSE-APACHE) and [LICENSE-MIT.md](LICENSE-MIT.md) for de
 
 **Willian Nguyen** - [hieunt(dot)hello(at)gmail(dot)com](mailto:)
 
-**Project Link** - [https://github.com/hnlearndev/rslife](https://github.com/hnlearndev/rslife)
+**Project link** - [https://github.com/hnlearndev/rslife](https://github.com/hnlearndev/rslife)
 
 ## References
 
@@ -335,6 +338,7 @@ See [LICENSE-APACHE](LICENSE-APACHE) and [LICENSE-MIT.md](LICENSE-MIT.md) for de
 - [Actuarial Mathematics](https://www.goodreads.com/book/show/1715653.Actuarial_Mathematics)
 - [Society of Actuaries Mortality and Morbidity Tables](https://mort.soa.org)
 - [Institute and Faculty of Actuaries Mortality and Morbidity Tables](https://www.actuaries.org.uk/learn-and-develop/continuous-mortality-investigation/cmi-mortality-and-morbidity-tables)
+- [Australian Government Actuary](https://aga.gov.au)
 - Standard actuarial notation and practices
 
 ## Similar Projects
