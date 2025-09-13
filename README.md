@@ -1,6 +1,11 @@
 <h1 align="center">
 
-[![RSLife logo](https://raw.githubusercontent.com/hnlearndev/static/refs/heads/main/rslife/banner/banner.svg)](https://crates.io/crates/rslife)
+<a href="https://crates.io/crates/rslife">
+  <picture>
+    <source srcset="https://raw.githubusercontent.com/hnlearndev/static/refs/heads/main/rslife/banner/banner-dark.svg" media="(prefers-color-scheme: dark)">
+    <img src="https://raw.githubusercontent.com/hnlearndev/static/refs/heads/main/rslife/banner/banner-light.svg" alt="RSLife logo">
+  </picture>
+</a>
 
 </h1>
 
@@ -196,9 +201,9 @@ let data_from_ifoa = MortData::from_ifoa_url_id("AM92")?;
 let data_from_aga = MortData::from_aus_gov_act("Male", "2020-22")?;
 ```
 
-## The Builder Pattern Advantage - IMMERSE
+## The Builder Pattern Advantage - IMMERSE in C4 principles
 
-RSLife builder pattern let you IMMERSE yourselves in what truly matter for the core actuarial computation.
+RSLife is designed to deliver actuarial developer experience founded on 💥 C4 💥 pillars - _Clear_, _Concise_, _Coherent_ and _Comprehensive_,  letting you IMMERSE yourselves in what truly matter for the core actuarial computation.
 
 - **🎯 Intentional**: Only specify parameters that matter for each calculation
 - **🗒️ Manageable**: Avoid clutter from declaring all parameters
