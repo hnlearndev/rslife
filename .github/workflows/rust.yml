@@ -2,9 +2,9 @@ name: Rust CI (All Versions)
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   # This workflow orchestrates all Rust version checks
@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: [stable, '1.89.0', nightly]
+        rust: [stable, "1.95.0", nightly]
         include:
           - rust: nightly
             allow-failure: true

@@ -1,7 +1,8 @@
 [package]
 name = "rslife"
-version = "0.2.8"
+version = "0.2.9"
 edition = "2024"
+rust-version = "1.89.0"
 description = "A comprehensive Rust library for actuarial mortality table calculations and life insurance mathematics"
 license = "MIT"
 repository = "https://github.com/hnlearndev/rslife"
@@ -13,27 +14,15 @@ authors = ["RSLife Contributors"]
 readme = "README.md"
 
 [dependencies]
-calamine = "0.30.1"
-polars = { version = "0.50.0", features = ["lazy"] }
-reqwest = { version = "0.12.23", features = ["blocking"] }
-roxmltree = "0.20.0"
-spreadsheet-ods = "0.25.1"
+calamine = "0.34.0"
+polars = { version = "0.53.0", features = ["lazy"] }
+reqwest = { version = "0.13.3", features = ["blocking"] }
+roxmltree = "0.21.1"
+spreadsheet-ods = "1.0.1"
 garde = { version = "0.22", features = ["derive"] }
 bon = "3.7.2"
+rustc-hash = "2.1.0"
+once_cell = "1.20.0"
 
 [dev-dependencies]
 approx = "0.5"
-criterion = { version = "0.7.0", features = ["html_reports"] }
-codspeed-criterion-compat = "3.0.5"
-
-[[bench]]
-name = "commutations"
-harness = false
-
-[[bench]]
-name = "mortality_functions"
-harness = false
-
-[[bench]]
-name = "annuities"
-harness = false

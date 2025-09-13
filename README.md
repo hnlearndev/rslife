@@ -2,8 +2,8 @@
 
 <a href="https://crates.io/crates/rslife">
   <picture>
-    <source srcset="https://raw.githubusercontent.com/hnlearndev/static/refs/heads/main/rslife/banner/banner-dark.svg" media="(prefers-color-scheme: dark)">
-    <img src="https://raw.githubusercontent.com/hnlearndev/static/refs/heads/main/rslife/banner/banner-light.svg" alt="RSLife logo">
+    <source srcset="https://raw.githubusercontent.com/hnlearndev/static/refs/heads/main/rslife/banner/banner_dark.svg" media="(prefers-color-scheme: dark)">
+    <img src="https://raw.githubusercontent.com/hnlearndev/static/refs/heads/main/rslife/banner/banner_light.svg" alt="RSLife logo">
   </picture>
 </a>
 
@@ -14,15 +14,14 @@
 [![crates.io Latest Release](https://img.shields.io/crates/v/rslife.svg)](https://crates.io/crates/rslife)
 [![Documentation](https://docs.rs/rslife/badge.svg)](https://docs.rs/rslife/latest/rslife/)
 [![codecov](https://img.shields.io/codecov/c/github/hnlearndev/rslife?logo=codecov&label=coverage)](https://app.codecov.io/gh/hnlearndev/rslife)
-[![Performance](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json?org=hnlearndev&repo=rslife&label=performance)](https://codspeed.io/hnlearndev/rslife)
 
 ![Crates.io Total Downloads](https://img.shields.io/crates/d/rslife?style=social)
 
-| Rust Version | Build Status | Test Status |
-|:------------:|:------------:|:-----------:|
-| **Stable**   | [![Build Status - Stable](https://img.shields.io/github/actions/workflow/status/hnlearndev/rslife/rust-stable.yml?branch=main&label=build&style=flat-square)](https://github.com/hnlearndev/rslife/actions/workflows/rust-stable.yml) | [![Test Status - Stable](https://img.shields.io/github/actions/workflow/status/hnlearndev/rslife/rust-stable.yml?branch=main&label=tests&style=flat-square)](https://github.com/hnlearndev/rslife/actions/workflows/rust-stable.yml) |
-| **1.89.0**   | [![Build Status - 1.89.0](https://img.shields.io/github/actions/workflow/status/hnlearndev/rslife/rust-1.89.0.yml?branch=main&label=build&style=flat-square)](https://github.com/hnlearndev/rslife/actions/workflows/rust-1.89.0.yml) | [![Test Status - 1.89.0](https://img.shields.io/github/actions/workflow/status/hnlearndev/rslife/rust-1.89.0.yml?branch=main&label=tests&style=flat-square)](https://github.com/hnlearndev/rslife/actions/workflows/rust-1.89.0.yml) |
-| **Nightly**  | [![Build Status - Nightly](https://img.shields.io/github/actions/workflow/status/hnlearndev/rslife/rust-nightly.yml?branch=main&label=build&style=flat-square)](https://github.com/hnlearndev/rslife/actions/workflows/rust-nightly.yml) | [![Test Status - Nightly](https://img.shields.io/github/actions/workflow/status/hnlearndev/rslife/rust-nightly.yml?branch=main&label=tests&style=flat-square)](https://github.com/hnlearndev/rslife/actions/workflows/rust-nightly.yml) |
+| Rust Version |                                                                                                               Build Status                                                                                                                |                                                                                                               Test Status                                                                                                                |
+| :----------: | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
+|   **MSRV**   |    [![Build Status - MSRV](https://img.shields.io/github/actions/workflow/status/hnlearndev/rslife/rust-1.89.0.yml?branch=main&label=build&style=flat-square)](https://github.com/hnlearndev/rslife/actions/workflows/rust-1.89.0.yml)    |    [![Test Status - MSRV](https://img.shields.io/github/actions/workflow/status/hnlearndev/rslife/rust-1.89.0.yml?branch=main&label=tests&style=flat-square)](https://github.com/hnlearndev/rslife/actions/workflows/rust-1.89.0.yml)    |
+|  **Stable**  |   [![Build Status - Stable](https://img.shields.io/github/actions/workflow/status/hnlearndev/rslife/rust-stable.yml?branch=main&label=build&style=flat-square)](https://github.com/hnlearndev/rslife/actions/workflows/rust-stable.yml)   |   [![Test Status - Stable](https://img.shields.io/github/actions/workflow/status/hnlearndev/rslife/rust-stable.yml?branch=main&label=tests&style=flat-square)](https://github.com/hnlearndev/rslife/actions/workflows/rust-stable.yml)   |
+| **Nightly**  | [![Build Status - Nightly](https://img.shields.io/github/actions/workflow/status/hnlearndev/rslife/rust-nightly.yml?branch=main&label=build&style=flat-square)](https://github.com/hnlearndev/rslife/actions/workflows/rust-nightly.yml)] | [![Test Status - Nightly](https://img.shields.io/github/actions/workflow/status/hnlearndev/rslife/rust-nightly.yml?branch=main&label=tests&style=flat-square)](https://github.com/hnlearndev/rslife/actions/workflows/rust-nightly.yml)] |
 
 </div>
 
@@ -76,7 +75,7 @@ Or add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rslife = "0.2.8"
+rslife = "0.2.9"
 ```
 
 The crate is designed with three main layers to make actuarial computations convenient (more on [architecture from Wiki](https://github.com/hnlearndev/rslife/wiki/Architecture)), as illustrated below:
@@ -88,7 +87,7 @@ fn main() -> RSLifeResult<()> {
     // ========= FIRST LAYER - MORTALILITY DATA LOAD=========
     // Load mortality data
     // This seperation layer consists of multiple methods with flexibility at user hand to formulate the mortality or morbidity data
-    let data = MortData::from_ifoa_url_id("AM92")?;
+    let data = MortData::from_builtin("AM92")?;
 
     // ========= SECOND LAYER - MORTALILITY TABLE CONFIGURATION =========
     // Construct Mortality Table Config
@@ -113,17 +112,17 @@ fn main() -> RSLifeResult<()> {
     let life_annuity = aax()
       .mt(&mt)
       .i(0.03)
-      .x(65)
+      .x(65.0)
       .m(12) // monthly payable m=12
       .call()?;
 
     let deferred_term = Ax1n()
       .mt(&mt)
       .i(0.03)
-      .x(35)
-      .n(15)
+      .x(35.0)
+      .n(15.0)
       .entry_age(34) // Entry age for selected effect - duration
-      .t(5) // Deferred 5 years
+      .t(5.0) // Deferred 5 years
       .call()?;
 
     Ok(())
@@ -201,17 +200,52 @@ let data_from_ifoa = MortData::from_ifoa_url_id("AM92")?;
 let data_from_aga = MortData::from_aus_gov_act("Male", "2020-22")?;
 ```
 
+### Built-in Tables
+
+For frequently used tables, RSLife provides a preloaded cache via `MortData::from_builtin(id)`. The tables are loaded once on first access and shared across all subsequent calls — avoiding repeated I/O or network overhead.
+
+```rust
+// IFOA tables
+let am92 = MortData::from_builtin("AM92")?;
+let pfa92 = MortData::from_builtin("PFA92")?;
+let pma92 = MortData::from_builtin("PMA92")?;
+
+// IFOA projected tables (C10 / C20)
+let pfa92c10 = MortData::from_builtin("PFA92C10")?;
+let pma92c10 = MortData::from_builtin("PMA92C10")?;
+let pfa92c20 = MortData::from_builtin("PFA92C20")?;
+let pma92c20 = MortData::from_builtin("PMA92C20")?;
+
+// SOA tables
+let elt15_f = MortData::from_builtin("ELT15_F")?;
+let elt15_m = MortData::from_builtin("ELT15_M")?;
+let sult = MortData::from_builtin("SULT")?;
+```
+
+| ID         | Source | Description                               |
+| :--------- | :----: | :---------------------------------------- |
+| `AM92`     |  IFOA  | Male Assured Lives, 1991–94 experience    |
+| `PFA92`    |  IFOA  | Female Pensioners, 1991–94 experience     |
+| `PMA92`    |  IFOA  | Male Pensioners, 1991–94 experience       |
+| `PFA92C10` |  IFOA  | Female Pensioners, projected to year 2010 |
+| `PMA92C10` |  IFOA  | Male Pensioners, projected to year 2010   |
+| `PFA92C20` |  IFOA  | Female Pensioners, projected to year 2020 |
+| `PMA92C20` |  IFOA  | Male Pensioners, projected to year 2020   |
+| `ELT15_F`  |  SOA   | English Life Table No. 15, Female         |
+| `ELT15_M`  |  SOA   | English Life Table No. 15, Male           |
+| `SULT`     |  SOA   | Standard Ultimate Life Table              |
+
 ## The Builder Pattern Advantage - IMMERSE in C4 principles
 
-RSLife is designed to deliver actuarial developer experience founded on 💥 C4 💥 pillars - _Clear_, _Concise_, _Coherent_ and _Comprehensive_,  letting you IMMERSE yourselves in what truly matter for the core actuarial computation.
+RSLife with its builder pattern, founded on 💥<span style="color: #FF0000; font-weight: bold">C4</span>💥 pillars - _Clear_, _Concise_, _Coherent_ and _Comprehensive_, enhances actuarial developer experience (DX), letting you 🌊<span style="color: #27ae60; font-weight: bold">IMMERSE</span>🌊 yourselves in what truly matters for the core actuarial computation.
 
-- **🎯 Intentional**: Only specify parameters that matter for each calculation
-- **🗒️ Manageable**: Avoid clutter from declaring all parameters
-- **🔧 Maintainable**: Adding new parameters doesn't break existing code
-- **⚡ Efficient**: Automatic cross-field validation catches errors early
-- **📖 Readable**: Self-documenting code that's easy to understand
-- **🔒 Safe**: Compile-time validation prevents parameter mistakes
-- **🧁 Effortless**: Capable to construct complex calculations with minial code
+- **🎯 <span style="color: #27ae60; font-weight: bold">I</span>ntentional**: Only specify parameters that matter for each calculation
+- **🗒️ <span style="color: #27ae60; font-weight: bold">M</span>anageable**: Avoid clutter from declaring all parameters
+- **🔧 <span style="color: #27ae60; font-weight: bold">M</span>aintainable**: Adding new parameters doesn't break existing code
+- **⚡ <span style="color: #27ae60; font-weight: bold">E</span>fficient**: Automatic cross-field validation catches errors early
+- **📖 <span style="color: #27ae60; font-weight: bold">R</span>eadable**: Self-documenting code that's easy to understand
+- **🔒 <span style="color: #27ae60; font-weight: bold">S</span>afe**: Compile-time validation prevents parameter mistakes
+- **🧁 <span style="color: #27ae60; font-weight: bold">E</span>ffortless**: Capable to construct complex calculations with minial code
 
 **vs. Traditional Approaches:**
 
@@ -235,7 +269,7 @@ let result = some_function(&config, 35, 0.03, 1, 0, 1, 1, Some(30))?;
 let result = Ax()
   .mt(&config)
   .i(0.03)
-  .x(35)
+  .x(35.0)
   .entry_age(34)
   .call()?;
 ```
@@ -291,7 +325,7 @@ Immediate/In-arrears version:
 
 **Survival Probabilities:**
 
-- `tpx`, `tqx`
+- `tpx`, `tqx`, `lx`, `dx`
 
 **Commutation:**
 
@@ -308,7 +342,9 @@ Check out the `examples/` directory for comprehensive examples:
 - **`basic_usage.rs`** - Demonstrates basic usage of the package.
 - **`cm1_april_2025.rs`** - Using RSLife package to provide solution for [CM1 exam from IFOA](https://actuaries.org.uk/qualify/curriculum/actuarial-mathematics/).
 
-These examples will be updated when CM1  papers and examiners' report are published.
+These examples will be updated when CM1 papers and examiners' report are published.
+
+Not all the questions are part of the demonstration unless they are relevant to acturial computation features of the package.
 
 SOA examination materials are also under consideration to be added as a re-testing medium in the near future.
 
@@ -316,13 +352,14 @@ SOA examination materials are also under consideration to be added as a re-testi
 # Basic usage example
 cargo run --example basic_usage
 
-# April 2025 CM1 exam solution using RSLife
-cargo run --example cm1_april_2025
+# CM1 exams solution using RSLife
+cargo run --example cm1_apr_2025
+cargo run --example cm1_sep_2025
 ```
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Regardless of technical background, if you have a domain knowledge on actuarial computation, you are more than welcomed! Please feel free to submit a Pull Request.
 
 For major changes, please open an issue first to discuss what you would like to change.
 

@@ -1,11 +1,11 @@
 #![allow(non_snake_case)]
 #![allow(clippy::too_many_arguments)]
 
+use super::helpers::get_new_config_with_selected_table;
 use super::survivals::{tpx, tqx};
-use crate::RSLifeResult;
-use crate::helpers::get_new_config_with_selected_table;
 use crate::mt_config::MortTableConfig;
 use crate::params::SingleLifeParams;
+use crate::RSLifeResult;
 use bon::builder;
 
 // =======================================
@@ -36,7 +36,7 @@ use bon::builder;
 /// ## Basic Pure Endowment
 /// ```rust
 /// # use rslife::prelude::*;
-/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder()
 /// #     .data(mort_data)
 /// #     .build()
@@ -46,8 +46,8 @@ use bon::builder;
 /// let pure_endowment = Exn()
 ///     .mt(&config)
 ///     .i(0.03)    // 3% interest rate
-///     .x(30)      // age 30
-///     .n(10)      // 10 years
+///     .x(30.0)    // age 30
+///     .n(10.0)    // 10 years
 ///     .call()?;
 ///
 /// println!("10-year pure endowment: {:.6}", pure_endowment);
@@ -57,16 +57,16 @@ use bon::builder;
 /// ## Deferred Pure Endowment
 /// ```rust
 /// # use rslife::prelude::*;
-/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build()?;
 ///
 /// // 20-year pure endowment deferred 5 years for age 25
 /// let deferred_endowment = Exn()
 ///     .mt(&config)
 ///     .i(0.04)
-///     .x(25)
-///     .n(20)
-///     .t(5)  // 5-year deferral
+///     .x(25.0)
+///     .n(20.0)
+///     .t(5.0)  // 5-year deferral
 ///     .call()?;
 ///
 /// println!("Deferred pure endowment: {:.6}", deferred_endowment);
@@ -76,15 +76,15 @@ use bon::builder;
 /// ## Higher Moments
 /// ```rust
 /// # use rslife::prelude::*;
-/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build()?;
 ///
 /// // Second moment for variance calculations
 /// let second_moment = Exn()
 ///     .mt(&config)
 ///     .i(0.03)
-///     .x(40)
-///     .n(15)
+///     .x(40.0)
+///     .n(15.0)
 ///     .moment(2)  // Second moment
 ///     .call()?;
 ///
@@ -95,9 +95,9 @@ use bon::builder;
 pub fn Exn(
     mt: &MortTableConfig,
     i: f64,
-    x: u32,
-    n: u32,
-    #[builder(default = 0)] t: u32,
+    x: f64,
+    n: f64,
+    #[builder(default = 0.0)] t: f64,
     #[builder(default = 1)] moment: u32,
     entry_age: Option<u32>,
     #[builder(default = true)] validate: bool,
@@ -122,9 +122,6 @@ pub fn Exn(
 
     // As provided - no default
     let v = 1.0 / (1.0 + i);
-    let x = x as f64;
-    let t = t as f64;
-    let n = n as f64;
     let moment = moment as f64;
 
     // Decide if selected table is used
@@ -142,9 +139,9 @@ pub fn Exn(
 pub fn Axn1(
     mt: &MortTableConfig,
     i: f64,
-    x: u32,
-    n: u32,
-    #[builder(default = 0)] t: u32,
+    x: f64,
+    n: f64,
+    #[builder(default = 0.0)] t: f64,
     #[builder(default = 1)] moment: u32,
     entry_age: Option<u32>,
     #[builder(default = true)] validate: bool,
@@ -189,7 +186,7 @@ pub fn Axn1(
 /// ## Basic Term Life Insurance
 /// ```rust
 /// # use rslife::prelude::*;
-/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder()
 /// #     .data(mort_data)
 /// #     .radix(100_000)
@@ -201,8 +198,8 @@ pub fn Axn1(
 /// let term_life = Ax1n()
 ///     .mt(&config)
 ///     .i(0.03)    // 3% interest rate
-///     .x(35)      // age 35
-///     .n(10)      // 10-year term
+///     .x(35.0)    // age 35
+///     .n(10.0)    // 10-year term
 ///     .call()?;
 ///
 /// println!("10-year term insurance: {:.6}", term_life);
@@ -212,7 +209,7 @@ pub fn Axn1(
 /// ## Deferred Term Life Insurance
 /// ```rust
 /// # use rslife::prelude::*;
-/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder()
 /// #     .data(mort_data)
 /// #     .radix(100_000)
@@ -224,9 +221,9 @@ pub fn Axn1(
 /// let deferred_term = Ax1n()
 ///     .mt(&config)
 ///     .i(0.04)
-///     .x(40)
-///     .n(20)
-///     .t(5)  // 5-year deferral
+///     .x(40.0)
+///     .n(20.0)
+///     .t(5.0)  // 5-year deferral
 ///     .call()?;
 ///
 /// println!("Deferred term insurance: {:.6}", deferred_term);
@@ -236,7 +233,7 @@ pub fn Axn1(
 /// ## Higher Moments
 /// ```rust
 /// # use rslife::prelude::*;
-/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder()
 /// #     .data(mort_data)
 /// #     .radix(100_000)
@@ -248,8 +245,8 @@ pub fn Axn1(
 /// let second_moment = Ax1n()
 ///     .mt(&config)
 ///     .i(0.03)
-///     .x(45)
-///     .n(15)
+///     .x(45.0)
+///     .n(15.0)
 ///     .moment(2)  // Second moment
 ///     .call()?;
 ///
@@ -260,9 +257,9 @@ pub fn Axn1(
 pub fn Ax1n(
     mt: &MortTableConfig,
     i: f64,
-    x: u32,
-    n: u32,
-    #[builder(default = 0)] t: u32,
+    x: f64,
+    n: f64,
+    #[builder(default = 0.0)] t: f64,
     #[builder(default = 1)] m: u32,
     #[builder(default = 1)] moment: u32,
     entry_age: Option<u32>,
@@ -305,7 +302,7 @@ pub fn Ax1n(
 /// ## Basic Whole Life Insurance
 /// ```rust
 /// # use rslife::prelude::*;
-/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder()
 /// #     .data(mort_data)
 /// #     .build()?;
@@ -314,7 +311,7 @@ pub fn Ax1n(
 /// let whole_life = Ax()
 ///     .mt(&config)
 ///     .i(0.03)    // 3% interest rate
-///     .x(40)      // age 40
+///     .x(40.0)    // age 40
 ///     .call()?;
 ///
 /// println!("Whole life insurance: {:.6}", whole_life);
@@ -324,7 +321,7 @@ pub fn Ax1n(
 /// ## Deferred Whole Life Insurance
 /// ```rust
 /// # use rslife::prelude::*;
-/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder()
 /// #     .data(mort_data)
 /// #     .build()?;
@@ -333,8 +330,8 @@ pub fn Ax1n(
 /// let deferred_whole_life = Ax()
 ///     .mt(&config)
 ///     .i(0.04)
-///     .x(35)
-///     .t(10)
+///     .x(35.0)
+///     .t(10.0)
 ///     .call()?;
 ///
 /// println!("Deferred whole life insurance: {:.6}", deferred_whole_life);
@@ -344,7 +341,7 @@ pub fn Ax1n(
 /// ## Higher Moments
 /// ```rust
 /// # use rslife::prelude::*;
-/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder()
 /// #     .data(mort_data)
 /// #     .radix(100_000)
@@ -356,7 +353,7 @@ pub fn Ax1n(
 /// let second_moment = Ax()
 ///     .mt(&config)
 ///     .i(0.03)
-///     .x(50)
+///     .x(50.0)
 ///     .moment(2)
 ///     .call()?;
 ///
@@ -367,14 +364,14 @@ pub fn Ax1n(
 pub fn Ax(
     mt: &MortTableConfig,
     i: f64,
-    x: u32,
-    #[builder(default = 0)] t: u32,
+    x: f64,
+    #[builder(default = 0.0)] t: f64,
     #[builder(default = 1)] m: u32,
     #[builder(default = 1)] moment: u32,
     entry_age: Option<u32>,
     #[builder(default = true)] validate: bool,
 ) -> RSLifeResult<f64> {
-    let max_age = mt.max_age()?;
+    let max_age = mt.max_age()? as f64;
     let n = max_age - x - t;
     benefit_procedure(
         mt,
@@ -414,15 +411,15 @@ pub fn Ax(
 /// ## Basic Endowment Insurance
 /// ```rust
 /// # use rslife::prelude::*;
-/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build()?;
 ///
 /// // 10-year endowment insurance for age 30
 /// let endowment = Axn()
 ///     .mt(&config)
 ///     .i(0.03)    // 3% interest rate
-///     .x(30)      // age 30
-///     .n(10)      // 10-year term
+///     .x(30.0)    // age 30
+///     .n(10.0)    // 10-year term
 ///     .call()?;
 ///
 /// println!("10-year endowment insurance: {:.6}", endowment);
@@ -432,16 +429,16 @@ pub fn Ax(
 /// ## Deferred Endowment Insurance
 /// ```rust
 /// # use rslife::prelude::*;
-/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build()?;
 ///
 /// // 20-year endowment insurance deferred 5 years for age 40
 /// let deferred_endowment = Axn()
 ///     .mt(&config)
 ///     .i(0.04)
-///     .x(40)
-///     .n(20)
-///     .t(5)  // 5-year deferral
+///     .x(40.0)
+///     .n(20.0)
+///     .t(5.0)  // 5-year deferral
 ///     .call()?;
 ///
 /// println!("Deferred endowment insurance: {:.6}", deferred_endowment);
@@ -451,15 +448,15 @@ pub fn Ax(
 /// ## Higher Moments
 /// ```rust
 /// # use rslife::prelude::*;
-/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build()?;
 ///
 /// // Second moment for variance calculations
 /// let second_moment = Axn()
 ///     .mt(&config)
 ///     .i(0.03)
-///     .x(45)
-///     .n(15)
+///     .x(45.0)
+///     .n(15.0)
 ///     .moment(2)  // Second moment
 ///     .call()?;
 ///
@@ -470,9 +467,9 @@ pub fn Ax(
 pub fn Axn(
     mt: &MortTableConfig,
     i: f64,
-    x: u32,
-    n: u32,
-    #[builder(default = 0)] t: u32,
+    x: f64,
+    n: f64,
+    #[builder(default = 0.0)] t: f64,
     #[builder(default = 1)] m: u32,
     #[builder(default = 1)] moment: u32,
     entry_age: Option<u32>,
@@ -533,14 +530,14 @@ pub fn Axn(
 /// ## Basic Increasing Term
 /// ```rust
 /// # use rslife::prelude::*;
-/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder()
 /// #     .data(mort_data)
 /// #     .radix(100_000)
 /// #     .pct(1.0)
 /// #     .assumption(AssumptionEnum::UDD)
 /// #     .build()?;
-/// let inc_term = IAx1n().mt(&config).i(0.03).x(40).n(10).call()?;
+/// let inc_term = IAx1n().mt(&config).i(0.03).x(40.0).n(10.0).call()?;
 /// println!("Increasing term: {:.6}", inc_term);
 /// # RSLifeResult::Ok(())
 /// ```
@@ -548,9 +545,9 @@ pub fn Axn(
 pub fn IAx1n(
     mt: &MortTableConfig,
     i: f64,
-    x: u32,
-    n: u32,
-    #[builder(default = 0)] t: u32,
+    x: f64,
+    n: f64,
+    #[builder(default = 0.0)] t: f64,
     #[builder(default = 1)] m: u32,
     #[builder(default = 1)] moment: u32,
     entry_age: Option<u32>,
@@ -593,9 +590,9 @@ pub fn IAx1n(
 /// ## Basic Increasing Whole Life
 /// ```rust
 /// # use rslife::prelude::*;
-/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build()?;
-/// let inc_whole_life = IAx().mt(&config).i(0.03).x(40).call()?;
+/// let inc_whole_life = IAx().mt(&config).i(0.03).x(40.0).call()?;
 /// println!("Increasing whole life: {:.6}", inc_whole_life);
 /// # RSLifeResult::Ok(())
 /// ```
@@ -603,14 +600,14 @@ pub fn IAx1n(
 pub fn IAx(
     mt: &MortTableConfig,
     i: f64,
-    x: u32,
-    #[builder(default = 0)] t: u32,
+    x: f64,
+    #[builder(default = 0.0)] t: f64,
     #[builder(default = 1)] m: u32,
     #[builder(default = 1)] moment: u32,
     entry_age: Option<u32>,
     #[builder(default = true)] validate: bool,
 ) -> RSLifeResult<f64> {
-    let max_age = mt.max_age()?;
+    let max_age = mt.max_age()? as f64;
     let n = max_age - x - t;
     benefit_procedure(
         mt,
@@ -649,9 +646,9 @@ pub fn IAx(
 /// ## Basic Increasing Endowment
 /// ```rust
 /// # use rslife::prelude::*;
-/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build()?;
-/// let inc_endowment = IAxn().mt(&config).i(0.03).x(40).n(10).call()?;
+/// let inc_endowment = IAxn().mt(&config).i(0.03).x(40.0).n(10.0).call()?;
 /// println!("Increasing endowment: {:.6}", inc_endowment);
 /// # RSLifeResult::Ok(())
 /// ```
@@ -659,9 +656,9 @@ pub fn IAx(
 pub fn IAxn(
     mt: &MortTableConfig,
     i: f64,
-    x: u32,
-    n: u32,
-    #[builder(default = 0)] t: u32,
+    x: f64,
+    n: f64,
+    #[builder(default = 0.0)] t: f64,
     #[builder(default = 1)] m: u32,
     #[builder(default = 1)] moment: u32,
     entry_age: Option<u32>,
@@ -722,9 +719,9 @@ pub fn IAxn(
 /// ## Basic Decreasing Term
 /// ```rust
 /// # use rslife::prelude::*;
-/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build()?;
-/// let dec_term = DAx1n().mt(&config).i(0.03).x(40).n(10).call()?;
+/// let dec_term = DAx1n().mt(&config).i(0.03).x(40.0).n(10.0).call()?;
 /// println!("Decreasing term: {:.6}", dec_term);
 /// # RSLifeResult::Ok(())
 /// ```
@@ -732,9 +729,9 @@ pub fn IAxn(
 pub fn DAx1n(
     mt: &MortTableConfig,
     i: f64,
-    x: u32,
-    n: u32,
-    #[builder(default = 0)] t: u32,
+    x: f64,
+    n: f64,
+    #[builder(default = 0.0)] t: f64,
     #[builder(default = 1)] m: u32,
     #[builder(default = 1)] moment: u32,
     entry_age: Option<u32>,
@@ -777,9 +774,9 @@ pub fn DAx1n(
 /// ## Basic Decreasing Endowment
 /// ```rust
 /// # use rslife::prelude::*;
-/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build()?;
-/// let dec_endowment = DAxn().mt(&config).i(0.03).x(40).n(10).call()?;
+/// let dec_endowment = DAxn().mt(&config).i(0.03).x(40.0).n(10.0).call()?;
 /// println!("Decreasing endowment: {:.6}", dec_endowment);
 /// # RSLifeResult::Ok(())
 /// ```
@@ -787,9 +784,9 @@ pub fn DAx1n(
 pub fn DAxn(
     mt: &MortTableConfig,
     i: f64,
-    x: u32,
-    n: u32,
-    #[builder(default = 0)] t: u32,
+    x: f64,
+    n: f64,
+    #[builder(default = 0.0)] t: f64,
     #[builder(default = 1)] m: u32,
     #[builder(default = 1)] moment: u32,
     entry_age: Option<u32>,
@@ -843,9 +840,9 @@ pub fn DAxn(
 /// ## Basic Geometric Whole Life
 /// ```rust
 /// # use rslife::prelude::*;
-/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build()?;
-/// let geom_whole_life = gAx().mt(&config).i(0.03).x(40).g(0.02).call()?;
+/// let geom_whole_life = gAx().mt(&config).i(0.03).x(40.0).g(0.02).call()?;
 /// println!("Geometric whole life: {:.6}", geom_whole_life);
 /// # RSLifeResult::Ok(())
 /// ```
@@ -853,8 +850,8 @@ pub fn DAxn(
 pub fn gAx(
     mt: &MortTableConfig,
     i: f64,
-    x: u32,
-    #[builder(default = 0)] t: u32,
+    x: f64,
+    #[builder(default = 0.0)] t: f64,
     #[builder(default = 1)] m: u32,
     #[builder(default = 1)] moment: u32,
     entry_age: Option<u32>,
@@ -897,9 +894,9 @@ pub fn gAx(
 /// ## Basic Geometric Term
 /// ```rust
 /// # use rslife::prelude::*;
-/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build()?;
-/// let geom_term = gAx1n().mt(&config).i(0.03).x(40).n(10).g(0.02).call()?;
+/// let geom_term = gAx1n().mt(&config).i(0.03).x(40.0).n(10.0).g(0.02).call()?;
 /// println!("Geometric term: {:.6}", geom_term);
 /// # RSLifeResult::Ok(())
 /// ```
@@ -907,9 +904,9 @@ pub fn gAx(
 pub fn gAx1n(
     mt: &MortTableConfig,
     i: f64,
-    x: u32,
-    n: u32,
-    #[builder(default = 0)] t: u32,
+    x: f64,
+    n: f64,
+    #[builder(default = 0.0)] t: f64,
     #[builder(default = 1)] m: u32,
     #[builder(default = 1)] moment: u32,
     entry_age: Option<u32>,
@@ -953,9 +950,9 @@ pub fn gAx1n(
 /// ## Basic Geometric Endowment
 /// ```rust
 /// # use rslife::prelude::*;
-/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build()?;
-/// let geom_endowment = gAxn().mt(&config).i(0.03).x(40).n(10).g(0.02).call()?;
+/// let geom_endowment = gAxn().mt(&config).i(0.03).x(40.0).n(10.0).g(0.02).call()?;
 /// println!("Geometric endowment: {:.6}", geom_endowment);
 /// # RSLifeResult::Ok(())
 /// ```
@@ -963,9 +960,9 @@ pub fn gAx1n(
 pub fn gAxn(
     mt: &MortTableConfig,
     i: f64,
-    x: u32,
-    n: u32,
-    #[builder(default = 0)] t: u32,
+    x: f64,
+    n: f64,
+    #[builder(default = 0.0)] t: f64,
     #[builder(default = 1)] m: u32,
     #[builder(default = 1)] moment: u32,
     entry_age: Option<u32>,
@@ -1005,9 +1002,9 @@ enum CashFlowStructure {
 fn benefit_procedure(
     mt: &MortTableConfig,
     i: f64,
-    x: u32,
-    n: u32,
-    t: u32,
+    x: f64,
+    n: f64,
+    t: f64,
     m: u32,
     moment: u32,
     entry_age: Option<u32>,
@@ -1036,13 +1033,11 @@ fn benefit_procedure(
     let mt = get_new_config_with_selected_table(mt, entry_age)?;
 
     // Initialize k array
-    let k_arr: Vec<f64> = (0..n * m).map(|k| k as f64).collect();
+    let total_periods = (n * m as f64) as u32;
+    let k_arr: Vec<f64> = (0..total_periods).map(|k| k as f64).collect();
 
     // Convert parameters to f64 for calculations
     let v = 1.0 / (1.0 + i);
-    let x = f64::from(x);
-    let n = f64::from(n);
-    let t = f64::from(t);
     let m = f64::from(m);
     let moment = f64::from(moment);
 
@@ -1097,13 +1092,13 @@ fn benefit_procedure(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mt_config::MortTableConfig;
     use crate::mt_config::mt_data::MortData;
+    use crate::mt_config::MortTableConfig;
     use approx::assert_abs_diff_eq;
 
     // #[test]
     // fn test_fn_A1xn_cont_theory() {
-    //     let am92 = MortData::from_ifoa_url_id("AM92").expect("Failed to load AM92 selected table");
+    //     let am92 = MortData::from_builtin("AM92").expect("Failed to load AM92 selected table");
     //     let mt = MortTableConfig::builder().data(am92).build().unwrap();
     //     let regular = Ax1n().mt(&mt).i(0.05).x(70).n(20).call().unwrap();
     //     let cont = Ax1n()
@@ -1122,9 +1117,9 @@ mod tests {
     #[test]
     fn test_fn_A1xn_n_is_0() {
         // Edge case where n = 0 should return 0
-        let am92 = MortData::from_ifoa_url_id("AM92").expect("Failed to load AM92 selected table");
+        let am92 = MortData::from_builtin("AM92").expect("Failed to load AM92 selected table");
         let mt = MortTableConfig::builder().data(am92).build().unwrap();
-        let ans = Ax1n().mt(&mt).i(0.05).x(70).n(0).call().unwrap();
+        let ans = Ax1n().mt(&mt).i(0.05).x(70.0).n(0.0).call().unwrap();
         let expected = 0.0;
         assert_abs_diff_eq!(ans, expected, epsilon = 1e-6);
     }
@@ -1132,9 +1127,9 @@ mod tests {
     #[test]
     fn test_fn_Exn_n_is_0() {
         // Edge case where n = 0 should return 1
-        let am92 = MortData::from_ifoa_url_id("AM92").expect("Failed to load AM92 selected table");
+        let am92 = MortData::from_builtin("AM92").expect("Failed to load AM92 selected table");
         let mt = MortTableConfig::builder().data(am92).build().unwrap();
-        let ans = Exn().mt(&mt).i(0.05).x(70).n(0).call().unwrap();
+        let ans = Exn().mt(&mt).i(0.05).x(70.0).n(0.0).call().unwrap();
         let expected = 1.0;
         assert_abs_diff_eq!(ans, expected, epsilon = 1e-6);
     }
@@ -1142,10 +1137,10 @@ mod tests {
     #[test]
     fn test_fn_Ax_benefit_01() {
         // From Formulae and Tables for Actuarial Examinations AM92 table
-        let am92 = MortData::from_ifoa_url_id("AM92").expect("Failed to load AM92 selected table");
+        let am92 = MortData::from_builtin("AM92").expect("Failed to load AM92 selected table");
         let mt = MortTableConfig::builder().data(am92).build().unwrap();
 
-        let age = [17, 36, 71, 90];
+        let age = [17.0, 36.0, 71.0, 90.0];
 
         // Value from examination material
         let expected_ultimate = [0.10127, 0.19933, 0.61548, 0.84196];
@@ -1157,7 +1152,13 @@ mod tests {
             let ultimate = Ax().mt(&mt).i(0.04).x(a).call().unwrap();
             assert_abs_diff_eq!(ultimate, expected_ultimate[i], epsilon = 1e-5);
 
-            let selected = Ax().mt(&mt).i(0.04).x(a).entry_age(a).call().unwrap();
+            let selected = Ax()
+                .mt(&mt)
+                .i(0.04)
+                .x(a)
+                .entry_age(a as u32)
+                .call()
+                .unwrap();
             assert_abs_diff_eq!(selected, expected_selected[i], epsilon = 1e-5);
 
             let second_moment_ultimate = Ax().mt(&mt).i(0.04).x(a).moment(2).call().unwrap();
@@ -1172,7 +1173,7 @@ mod tests {
                 .i(0.04)
                 .x(a)
                 .moment(2)
-                .entry_age(a)
+                .entry_age(a as u32)
                 .call()
                 .unwrap();
             assert_abs_diff_eq!(
@@ -1190,7 +1191,7 @@ mod tests {
             MortData::from_soa_custom("SULT").expect("Failed to load Standard Ultimate Life Table");
         let mt = MortTableConfig::builder().data(sult).build().unwrap();
 
-        let age = [20, 27, 63, 84, 100];
+        let age = [20.0, 27.0, 63.0, 84.0, 100.0];
 
         // Values from examination material
         let expected = [0.04922, 0.06725, 0.32785, 0.65990, 0.87068];
@@ -1208,25 +1209,25 @@ mod tests {
     #[test]
     fn test_fn_Axn_benefit_01() {
         // From Formulae and Tables for Actuarial Examinations
-        let am92 = MortData::from_ifoa_url_id("AM92").expect("Failed to load AM92 selected table");
+        let am92 = MortData::from_builtin("AM92").expect("Failed to load AM92 selected table");
         let mt = MortTableConfig::builder().data(am92).build().unwrap();
 
-        let age = [17, 29, 43, 59];
+        let age = [17.0, 29.0, 43.0, 59.0];
 
         // Values from examination material
         let expected_ultimate = [0.19475, 0.30525, 0.52073, 0.96154];
         let expected_selected = [0.19459, 0.30515, 0.52061, 0.96154];
 
         for (i, &a) in age.iter().enumerate() {
-            let ultimate = Axn().mt(&mt).i(0.04).x(a).n(60 - a).call().unwrap();
+            let ultimate = Axn().mt(&mt).i(0.04).x(a).n(60.0 - a).call().unwrap();
             assert_abs_diff_eq!(ultimate, expected_ultimate[i], epsilon = 1e-5);
 
             let selected = Axn()
                 .mt(&mt)
                 .i(0.04)
                 .x(a)
-                .n(60 - a)
-                .entry_age(a)
+                .n(60.0 - a)
+                .entry_age(a as u32)
                 .call()
                 .unwrap();
             assert_abs_diff_eq!(selected, expected_selected[i], epsilon = 1e-5);
@@ -1240,17 +1241,17 @@ mod tests {
             MortData::from_soa_custom("SULT").expect("Failed to load Standard Ultimate Life Table");
         let mt = MortTableConfig::builder().data(sult).build().unwrap();
 
-        let age = [20, 34, 57, 91, 100];
+        let age = [20.0, 34.0, 57.0, 91.0, 100.0];
 
         // Values from examination material
         let expected_n10 = [0.61433, 0.61460, 0.61914, 0.77609, 0.87078];
         let expected_n20 = [0.37829, 0.37961, 0.40118, 0.76735, 0.87068];
 
         for (i, &a) in age.iter().enumerate() {
-            let n10 = Axn().mt(&mt).i(0.05).x(a).n(10).call().unwrap();
+            let n10 = Axn().mt(&mt).i(0.05).x(a).n(10.0).call().unwrap();
             assert_abs_diff_eq!(n10, expected_n10[i], epsilon = 1e-5);
 
-            let n20 = Axn().mt(&mt).i(0.05).x(a).n(20).call().unwrap();
+            let n20 = Axn().mt(&mt).i(0.05).x(a).n(20.0).call().unwrap();
             assert_abs_diff_eq!(n20, expected_n20[i], epsilon = 1e-5);
         }
     }
@@ -1258,9 +1259,9 @@ mod tests {
     #[test]
     fn test_fn_IAx_benefit_01() {
         // From Formulae and Tables for Actuarial Examinations
-        let am92 = MortData::from_ifoa_url_id("AM92").expect("Failed to load AM92 selected table");
+        let am92 = MortData::from_builtin("AM92").expect("Failed to load AM92 selected table");
         let mt = MortTableConfig::builder().data(am92).build().unwrap();
-        let ans = IAx().mt(&mt).i(0.06).x(110).call().unwrap();
+        let ans = IAx().mt(&mt).i(0.06).x(110.0).call().unwrap();
         let expected = 1.42096;
         // During the testing, accuracy was drops
         // to 1e-4 at age 110
@@ -1273,16 +1274,16 @@ mod tests {
     #[test]
     fn test_fn_IAx1n_benefit_01() {
         // From April 2025 CM1 Question 3 part i
-        let am92 = MortData::from_ifoa_url_id("AM92").expect("Failed to load AM92 selected table");
+        let am92 = MortData::from_builtin("AM92").expect("Failed to load AM92 selected table");
         let mt = MortTableConfig::builder().data(am92).build().unwrap();
-        let ans = IAx1n().mt(&mt).i(0.04).x(50).n(10).call().unwrap();
+        let ans = IAx1n().mt(&mt).i(0.04).x(50.0).n(10.0).call().unwrap();
         let expected = 8.55929 - (882.85 / 1366.61) * (8.36234 + 10.0 * 0.45640);
         assert_abs_diff_eq!(ans, expected, epsilon = 1e-4);
     }
 
     #[test]
     fn test_debug_am92_structure() {
-        let am92 = MortData::from_ifoa_url_id("AM92").expect("Failed to load AM92 selected table");
+        let am92 = MortData::from_builtin("AM92").expect("Failed to load AM92 selected table");
         let mt = MortTableConfig::builder().data(am92).build().unwrap();
         // Debug output
         println!("DataFrame shape: {:?}", mt.data.dataframe.shape());
@@ -1315,7 +1316,7 @@ mod tests {
     #[test]
     fn test_debug_selected_table_processing() {
         // Create a MortTableConfig with AM92 data
-        let am92 = MortData::from_ifoa_url_id("AM92").expect("Failed to load AM92 selected table");
+        let am92 = MortData::from_builtin("AM92").expect("Failed to load AM92 selected table");
         let mt = MortTableConfig::builder().data(am92).build().unwrap();
 
         println!("Original table:");

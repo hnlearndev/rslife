@@ -16,28 +16,22 @@ pub use crate::mddf;
 // Core mortality table types and configuration
 pub use crate::mt_config::mt_data::MortData;
 pub use crate::mt_config::{AssumptionEnum, MortTableConfig};
+
 // All actuarial calculation functions (implementation functions from whole.rs)
-#[rustfmt::skip]
 pub use crate::int_rate_convert::*;
 
-pub use crate::annuities_certain::{Daan, Dan, Iaan, Ian, aan, an};
+pub use crate::annuities_certain::{aan, an, Daan, Dan, Iaan, Ian};
 
-pub use crate::single_life::survivals::{tpx, tqx};
+pub use crate::single_life::survivals::{dx, lx, tpx, tqx};
 
 pub use crate::single_life::commutations::{Cx, Dx, Mx, Nx, Rx, Sx};
 
-#[rustfmt::skip]
 pub use crate::single_life::benefits::{
-    Exn, Axn1, Ax1n, Ax, Axn,
-    IAx1n, IAxn, IAx,
-    DAx1n, DAxn,
-    gAx1n, gAxn, gAx,
+    gAx, gAx1n, gAxn, Ax, Ax1n, Axn, Axn1, DAx1n, DAxn, Exn, IAx, IAx1n, IAxn,
 };
 
-#[rustfmt::skip]
 pub use crate::single_life::annuities::{
-    aaxn,aax, Iaaxn, Iaax, Daaxn, gaax, gaaxn,
-    axn,ax, Iaxn, Iax, Daxn, gax, gaxn,
+    aax, aaxn, ax, axn, gaax, gaaxn, gax, gaxn, Daaxn, Daxn, Iaax, Iaaxn, Iax, Iaxn,
 };
 
 // Most commonly used Polars types for working with mortality tables

@@ -1,9 +1,15 @@
-use crate::RSLifeResult;
 use crate::mt_config::spreadsheet_helpers::{parse_excel_data, parse_excel_headers};
-use calamine::{Data, Reader, Xls, open_workbook_auto};
+use crate::RSLifeResult;
+use calamine::{open_workbook_auto, Data, Reader, Xls};
 use polars::prelude::*;
 use reqwest::blocking::get;
 use std::io::Cursor;
+
+// IFOA XLS tables embedded at compile time.
+// Paths are relative to this source file.
+const XLS_80SERIES: &[u8] = include_bytes!("../../data/80series.xls");
+const XLS_92SERIES: &[u8] = include_bytes!("../../data/92series.xls");
+const XLS_00SERIES: &[u8] = include_bytes!("../../data/00series.xls");
 
 /// IFOAMortXLS represents a parsed IFOA mortality table from an XLS file or URL.
 ///
@@ -124,14 +130,14 @@ impl IFOAMortXLS {
         // Obtain range from the IFOA URL
         let info_from_id = get_info_from_id(id)?;
         let structure = info_from_id.0;
-        let url_suffix = info_from_id.1;
+        let xls_name = info_from_id.1;
+        let url_suffix = info_from_id.2;
 
-        // TODO: url now also get from ONS not just IFOA
         let url = format!("https://www.actuaries.org.uk/documents/{url_suffix}");
 
-        let id = match structure {
+        let sheet_name = match structure {
             1 => id,
-            101 => {
+            101 | 102 => {
                 return Err(format!(
                     "{id} is not supported. Use method from_ifoa_builtin instead."
                 )
@@ -140,7 +146,12 @@ impl IFOAMortXLS {
             _ => return Err(format!("{id} is not supported").into()),
         };
 
-        let range = fetch_range_from_url(&url, id)?;
+        let range = if !xls_name.is_empty() {
+            fetch_range_from_local_data(&xls_name, sheet_name)?
+        } else {
+            fetch_range_from_url(&url, sheet_name)?
+        };
+
         data_process(structure, range)
     }
 
@@ -148,17 +159,24 @@ impl IFOAMortXLS {
         // Obtain range from the IFOA URL
         let info_from_id = get_info_from_id(id)?;
         let structure = info_from_id.0;
-        let url_suffix = info_from_id.1;
+        let xls_name = info_from_id.1;
+        let url_suffix = info_from_id.2;
 
         let url = format!("https://www.actuaries.org.uk/documents/{url_suffix}");
 
         let sheet_name = match structure {
-            // PFA92C20 and PMA92C20 is using PFA92 and PMA92 sheet. ID and Sheet name are not the same.
-            101 => id.strip_suffix("C20").unwrap(),
+            1 => id,
+            101 | 102 => &id[..id.len() - 3],
             _ => return Err(format!("{id} is not supported").into()),
         };
 
-        let range = fetch_range_from_url(&url, sheet_name)?;
+        // Check if xls_name is some string then use it
+        let range = if !xls_name.is_empty() {
+            fetch_range_from_local_data(&xls_name, sheet_name)?
+        } else {
+            fetch_range_from_url(&url, sheet_name)?
+        };
+
         data_process(structure, range)
     }
 }
@@ -170,7 +188,8 @@ impl IFOAMortXLS {
 fn data_process(structure: u32, range: calamine::Range<Data>) -> RSLifeResult<IFOAMortXLS> {
     let (description, df) = match structure {
         1 => data_process_01(range),
-        101 => data_process_101(range), // Custom series, same as 01 with C20 projection
+        101 => data_process_101(range),
+        102 => data_process_102(range),
         _ => Err(format!("Unsupported structure {structure}.").into()),
     }?;
 
@@ -198,11 +217,13 @@ fn data_process_01(range: calamine::Range<Data>) -> RSLifeResult<(String, DataFr
         let duration: u32 = header.parse().unwrap_or(0);
         let value_col = &columns[i];
         let age_col_u32: Vec<u32> = age_col.iter().map(|v| *v as u32).collect();
-        let df = DataFrame::new(vec![
+        let height = age_col.clone().len();
+        let columns = vec![
             Series::new("age".into(), age_col_u32).into_column(),
             Series::new("qx".into(), value_col.clone()).into_column(),
             Series::new("duration".into(), vec![duration; age_col.len()]).into_column(),
-        ])?;
+        ];
+        let df = DataFrame::new(height, columns)?;
         lfs.push(df.lazy());
     }
     let stacked = concat(&lfs, Default::default())?.collect()?;
@@ -217,6 +238,17 @@ fn data_process_01(range: calamine::Range<Data>) -> RSLifeResult<(String, DataFr
 }
 
 fn data_process_101(range: calamine::Range<Data>) -> RSLifeResult<(String, DataFrame)> {
+    data_process_10x(range, 2010.0)
+}
+
+fn data_process_102(range: calamine::Range<Data>) -> RSLifeResult<(String, DataFrame)> {
+    data_process_10x(range, 2020.0)
+}
+
+fn data_process_10x(
+    range: calamine::Range<Data>,
+    c_input: f64,
+) -> RSLifeResult<(String, DataFrame)> {
     // Use process from data_process_01
     let (description, dataframe) = data_process_01(range)?;
 
@@ -254,7 +286,7 @@ fn data_process_101(range: calamine::Range<Data>) -> RSLifeResult<(String, DataF
         .with_column(
             (col("alpha")
                 + (lit(1.0) - col("alpha"))
-                    * (lit(1.0) - col("f")).pow(lit((2020.0 - 1992.0) / 20.0)))
+                    * (lit(1.0) - col("f")).pow(lit((c_input - 1992.0) / 20.0)))
             .alias("reduction_factor"),
         )
         .with_column((col("qx") * col("reduction_factor")).alias("qx_reduced"))
@@ -264,32 +296,51 @@ fn data_process_101(range: calamine::Range<Data>) -> RSLifeResult<(String, DataF
     // Return result
     Ok((new_description, dataframe))
 }
+
 //---------------------------------------------------------------------
 
-fn get_info_from_id(id: &str) -> RSLifeResult<(u32, &str)> {
+fn get_info_from_id(id: &str) -> RSLifeResult<(u32, &str, &str)> {
     // These are updated manually from the IFOA website
     match id {
         // 80-series
-        "AM80" | "AF80" | "AF80(5)" | "TM80" | "PML80" | "PFL80" | "PMA80" | "PFA80" | "IM80"
-        | "IF80" | "WL80" | "WA80" => Ok((1, "80-series-base-mortality-tables-complete-set")),
+        "AM80" | "AF80" | "AM80(5)" | "TM80" | "PML80" | "PFL80" | "PMA80" | "PFA80" | "IM80"
+        | "IF80" | "WL80" | "WA80" => Ok((
+            1,
+            "80series",
+            "80-series-base-mortality-tables-complete-set",
+        )),
 
         // 92-series
         "AM92" | "AF92" | "TM92" | "TF92" | "IML92" | "IFL92" | "IMA92" | "IFA92" | "PML92"
-        | "PFL92" | "PFA92" | "PMA92" | "WL92" | "WA92" | "RMV92" | "RFV92" => {
-            Ok((1, "92-series-base-mortality-tables-complete-set"))
-        }
+        | "PFL92" | "PFA92" | "PMA92" | "WL92" | "WA92" | "RMV92" | "RFV92" => Ok((
+            1,
+            "92series",
+            "92-series-base-mortality-tables-complete-set",
+        )),
 
         // 00-series
         "AMC00" | "AMS00" | "AMN00" | "AFC00" | "AFS00" | "AFN00" | "TMC00" | "TMS00" | "TMN00"
         | "TFC00" | "TFS00" | "TFN00" | "IML00" | "IFL00" | "PNML00" | "PNMA00" | "PEML00"
         | "PEMA00" | "PCML00" | "PCMA00" | "PNFL00" | "PNFA00" | "PEFL00" | "PEFA00" | "PCFL00"
         | "PCFA00" | "WL00" | "WA00" | "RMD00" | "RMV00" | "RMC00" | "RFD00" | "RFV00"
-        | "RFC00" | "PPMD00" | "PPMV00" | "PPMC00" | "PPFD00" | "PPFV00" => {
-            Ok((1, "00-series-base-mortality-tables-complete-set"))
-        }
+        | "RFC00" | "PPMD00" | "PPMV00" | "PPMC00" | "PPFD00" | "PPFV00" => Ok((
+            1,
+            "00series",
+            "00-series-base-mortality-tables-complete-set",
+        )),
 
         // Custom series
-        "PMA92C20" | "PFA92C20" => Ok((101, "92-series-base-mortality-tables-complete-set")),
+        "PMA92C10" | "PFA92C10" => Ok((
+            101,
+            "92series",
+            "92-series-base-mortality-tables-complete-set",
+        )),
+
+        "PMA92C20" | "PFA92C20" => Ok((
+            102,
+            "92series",
+            "92-series-base-mortality-tables-complete-set",
+        )),
 
         // Unsupported
         _ => Err(format!("Unknown id: {id}").into()),
@@ -298,16 +349,30 @@ fn get_info_from_id(id: &str) -> RSLifeResult<(u32, &str)> {
 
 //---------------------------------------------------------------------
 
-///// 0. Get the number of sheets in url provided
-// fn get_number_of_sheets(url: &str) -> Result<usize, Box<dyn Error>> {
-//     let response = get(url)?;
-//     let bytes = response.bytes()?;
-//     let workbook = Xls::new(Cursor::new(bytes))?;
-//     let sheet_count = workbook.sheet_names().len();
-//     Ok(sheet_count)
-// }
+/// 1a. Retrieve the data from an embedded XLS file and return the calamine::Range<Data> for the specified sheet.
+///
+/// The XLS bytes are compiled into the binary via `include_bytes!`, so this
+/// function does not touch the filesystem at runtime.
+fn fetch_range_from_local_data(
+    file_name: &str,
+    sheet_name: &str,
+) -> RSLifeResult<calamine::Range<Data>> {
+    let bytes: &[u8] = match file_name {
+        "80series" => XLS_80SERIES,
+        "92series" => XLS_92SERIES,
+        "00series" => XLS_00SERIES,
+        _ => return Err(format!("No embedded data for {file_name}").into()),
+    };
+    let mut workbook = Xls::new(Cursor::new(bytes))?;
+    let sheet_names = workbook.sheet_names().to_owned();
+    if !sheet_names.iter().any(|n| n == sheet_name) {
+        return Err(format!("Sheet '{sheet_name}' not found in workbook").into());
+    }
+    let range = workbook.worksheet_range(sheet_name)?;
+    Ok(range)
+}
 
-/// 1. Retrieve the data from a URL and return the calamine::Range<Data> for the first sheet
+/// 1b. Retrieve the data from a URL and return the calamine::Range<Data> for the first sheet
 fn fetch_range_from_url(url: &str, sheet_name: &str) -> RSLifeResult<calamine::Range<Data>> {
     let response = get(url)?;
     let bytes = response.bytes()?;
@@ -362,6 +427,7 @@ fn extract_headers(range: &calamine::Range<Data>) -> Vec<String> {
 // ================================================
 // UNIT TESTS
 // ================================================
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -369,6 +435,18 @@ mod tests {
     #[test]
     fn test_ifoa_mort_xls_am92() {
         let result = IFOAMortXLS::from_url_id("AM92");
+        match result {
+            Ok(xls) => {
+                println!("Description: {}", xls.description);
+                println!("DataFrame:\n{:?}", xls.dataframe);
+            }
+            Err(e) => panic!("Failed to load IFOA XLS: {e}"),
+        }
+    }
+
+    #[test]
+    fn test_ifoa_mort_xls_pfa92c10() {
+        let result = IFOAMortXLS::from_custom("PFA92C10");
         match result {
             Ok(xls) => {
                 println!("Description: {}", xls.description);

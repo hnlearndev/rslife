@@ -1,5 +1,5 @@
-use crate::RSLifeResult;
 use crate::mt_config::spreadsheet_helpers::{parse_excel_data, parse_excel_headers};
+use crate::RSLifeResult;
 use calamine::{Data, Reader, Xlsx};
 use polars::prelude::*;
 use reqwest::blocking::get;
@@ -78,6 +78,7 @@ impl AusGovActMortXLS {
 // ================================================
 // PRIVATE FUNCTIONS
 // ================================================
+
 fn parse_data(range: &calamine::Range<Data>, period: &str) -> RSLifeResult<Vec<Vec<f64>>> {
     let headers = parse_excel_headers(range, 1)?; // Header row is row 2 (0-based index 1)
 
@@ -107,6 +108,7 @@ fn parse_data(range: &calamine::Range<Data>, period: &str) -> RSLifeResult<Vec<V
 // ================================================
 // UNIT TESTS
 // ================================================
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -138,7 +140,7 @@ mod tests {
 
         // Verify DataFrame structure
         assert!(
-            !aus_mort.dataframe.is_empty(),
+            aus_mort.dataframe.height() > 0,
             "DataFrame should not be empty"
         );
         assert_eq!(

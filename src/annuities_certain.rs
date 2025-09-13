@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
-use crate::RSLifeResult;
 use crate::int_rate_convert::{eff_i_to_nom_d, eff_i_to_nom_i};
+use crate::RSLifeResult;
 use bon::builder;
 
 /// Annuity-certain due/in advance
@@ -9,7 +9,7 @@ use bon::builder;
 ///
 /// # Formula
 /// ```text
-/// ₜ| äₙ⁽ᵐ⁾ = vᵗ · (1 - vⁿ) / d⁽ᵐ⁾
+/// ₜ|äₙ⁽ᵐ⁾ = vᵗ · (1 - vⁿ) / d⁽ᵐ⁾
 /// ```
 /// where:
 /// - `v = 1/(1+i)` is the discount factor
@@ -53,7 +53,7 @@ pub fn aan(
 ///
 /// # Formula
 /// ```text
-/// ₜ| aₙ⁽ᵐ⁾ = vᵗ · (1 - vⁿ) / i⁽ᵐ⁾
+/// ₜ|aₙ⁽ᵐ⁾ = vᵗ · (1 - vⁿ) / i⁽ᵐ⁾
 /// ```
 /// where:
 /// - `v = 1/(1+i)` is the discount factor
@@ -83,7 +83,7 @@ pub fn an(
     let nom_i = eff_i_to_nom_i(i, m);
     let nom_d = eff_i_to_nom_d(i, m);
     let due = aan().i(i).n(n).t(t).m(m).call()?;
-    // ₜ| aₙ⁽ᵐ⁾ = vᵗ · (1 - vⁿ) / i⁽ᵐ⁾
+    // ₜ|aₙ⁽ᵐ⁾ = vᵗ · (1 - vⁿ) / i⁽ᵐ⁾
     let result = due * nom_d / nom_i;
     Ok(result)
 }
@@ -94,7 +94,7 @@ pub fn an(
 ///
 /// # Formula
 /// ```text
-/// ₜ| aₙ⁽ᵐ⁾ = vᵗ · (1 - vⁿ) / i⁽ᵐ⁾
+/// ₜ|(Iä)ₙ⁽ᵐ⁾ = vᵗ · (äₙ - n.vⁿ) / d⁽ᵐ⁾
 /// ```
 /// # Parameters
 /// - `i`: Effective annual interest rate
@@ -107,8 +107,8 @@ pub fn an(
 /// ## Basic Annuity-Certain Due
 /// ```rust
 /// # use rslife::prelude::*;
-/// let annuity_due = aan().i(0.03).n(10).call()?;
-/// println!("Annuity-certain due: {:.6}", annuity_due);
+/// let increasing_annuity_due = Iaan().i(0.03).n(10).call()?;
+/// println!("Increasing annuity-certain due: {:.6}", increasing_annuity_due);
 /// # RSLifeResult::Ok(())
 /// ```
 #[builder]
@@ -136,10 +136,9 @@ pub fn Iaan(
 /// Calculates the present value of an increasing annuity-certain immediate: payments increase by $1 each period, paid m times per year for n years, with payments at the end of each period.
 ///
 /// # Formula
-/// $$
-/// 	ext{PV} = v^t \cdot \frac{1 - v^n}{i^{(m)}}
-/// $$
-/// where $v = 1/(1+i)$, $i^{(m)}$ is the nominal rate convertible m times per year.
+/// ```text
+/// ₜ|(Ia)ₙ⁽ᵐ⁾ = ₜ|(Iä)ₙ⁽ᵐ⁾ * d⁽ᵐ⁾ / i⁽ᵐ⁾
+/// ```
 ///
 /// # Parameters
 /// - `i`: Effective annual interest rate
@@ -165,10 +164,9 @@ pub fn Ian(
 /// Calculates the present value of a decreasing annuity-certain immediate: payments decrease by $1 each period, paid m times per year for n years, with payments at the end of each period.
 ///
 /// # Formula
-/// $$
-/// 	ext{PV} = v^t \cdot \frac{n - \text{an}}{i^{(m)}}
-/// $$
-/// where $v = 1/(1+i)$, $i^{(m)}$ is the nominal rate convertible m times per year.
+/// ```text
+/// ₜ|(Da)ₙ⁽ᵐ⁾ = vᵗ · (n - aₙ) / i⁽ᵐ⁾
+/// ```
 ///
 /// # Parameters
 /// - `i`: Effective annual interest rate
@@ -199,10 +197,9 @@ pub fn Dan(
 /// Calculates the present value of a decreasing annuity-certain due: payments decrease by $1 each period, paid m times per year for n years, starting immediately (first payment at time 0).
 ///
 /// # Formula
-/// $$
-/// 	ext{PV} = \text{Dan} \cdot \frac{i^{(m)}}{d^{(m)}}
-/// $$
-/// where $i^{(m)}$ is the nominal rate convertible m times per year, $d^{(m)}$ is the nominal rate of discount convertible m times per year.
+/// ```text
+/// ₜ|(Dä)ₙ⁽ᵐ⁾ = ₜ|(Da)ₙ⁽ᵐ⁾ * i⁽ᵐ⁾ / d⁽ᵐ⁾
+/// ```
 ///
 /// # Parameters
 /// - `i`: Effective annual interest rate
@@ -228,10 +225,9 @@ pub fn Daan(
 /// Calculates the accumulated value at the end of n periods for an annuity-certain due: $1 per period, paid m times per year for n years, starting immediately.
 ///
 /// # Formula
-/// $$
-/// 	ext{AV} = \text{aan} \cdot (1 + i)^n
-/// $$
-/// where $i$ is the effective annual interest rate.
+/// ```text
+///  ₜ|s̈ₙ = ₜ|äₙ * (1+i)ⁿ
+/// ```
 ///
 /// # Parameters
 /// - `i`: Effective annual interest rate
@@ -255,9 +251,9 @@ pub fn ssn(
 /// Calculates the accumulated value at the end of n periods for an annuity-certain immediate: $1 per period, paid m times per year for n years, with payments at the end of each period.
 ///
 /// # Formula
-/// $$
-/// 	ext{AV} = \text{an} \cdot (1 + i)^n
-/// $$
+/// ```text
+/// ₜ|sₙ = ₜ|aₙ * (1+i)ⁿ
+/// ```
 /// where $i$ is the effective annual interest rate.
 ///
 /// # Parameters
@@ -282,9 +278,9 @@ pub fn sn(
 /// Calculates the accumulated value at the end of n periods for an increasing annuity-certain due: payments increase by $1 each period, paid m times per year for n years, starting immediately.
 ///
 /// # Formula
-/// $$
-/// 	ext{AV} = \text{Iaan} \cdot (1 + i)^n
-/// $$
+/// ```text
+/// ₜ|(Is̈)ₙ⁽ᵐ⁾ = ₜ|(Iä)ₙ⁽ᵐ⁾ * (1+i)ⁿ
+/// ```
 /// where $i$ is the effective annual interest rate.
 ///
 /// # Parameters
@@ -309,9 +305,9 @@ pub fn Issn(
 /// Calculates the accumulated value at the end of n periods for an increasing annuity-certain immediate: payments increase by $1 each period, paid m times per year for n years, with payments at the end of each period.
 ///
 /// # Formula
-/// $$
-/// 	ext{AV} = \text{Ian} \cdot (1 + i)^n
-/// $$
+/// ```text
+/// ₜ|(Is)ₙ⁽ᵐ⁾ = ₜ|(Ia)ₙ⁽ᵐ⁾ * (1+i)ⁿ
+/// ```
 /// where $i$ is the effective annual interest rate.
 ///
 /// # Parameters
@@ -336,9 +332,9 @@ pub fn Isn(
 /// Calculates the accumulated value at the end of n periods for a decreasing annuity-certain due: payments decrease by $1 each period, paid m times per year for n years, starting immediately.
 ///
 /// # Formula
-/// $$
-/// 	ext{AV} = \text{Daan} \cdot (1 + i)^n
-/// $$
+/// ```text
+/// ₜ|(Ds̈)ₙ⁽ᵐ⁾ = ₜ|(Da)ₙ⁽ᵐ⁾ * (1+i)ⁿ
+/// ```
 /// where $i$ is the effective annual interest rate.
 ///
 /// # Parameters
@@ -363,10 +359,9 @@ pub fn Dssn(
 /// Calculates the accumulated value at the end of n periods for a decreasing annuity-certain immediate: payments decrease by $1 each period, paid m times per year for n years, with payments at the end of each period.
 ///
 /// # Formula
-/// $$
-/// 	ext{AV} = \text{Dan} \cdot (1 + i)^n
-/// $$
-/// where $i$ is the effective annual interest rate.
+/// ```text
+/// ₜ|(Ds)ₙ⁽ᵐ⁾ = ₜ|(Da)ₙ⁽ᵐ⁾ * (1+i)ⁿ
+/// ```
 ///
 /// # Parameters
 /// - `i`: Effective annual interest rate
@@ -388,6 +383,7 @@ pub fn Dsn(
 // ================================================
 // UNIT TESTS
 // ================================================
+
 #[cfg(test)]
 mod tests {
     use super::*;

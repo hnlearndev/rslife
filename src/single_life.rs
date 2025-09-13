@@ -17,20 +17,20 @@
 //! ```rust
 //! # use rslife::prelude::*;
 //! // Load a mortality table (AM92)
-//! let mort_data = MortData::from_ifoa_url_id("AM92")?;
+//! let mort_data = MortData::from_builtin("AM92")?;
 //! let mt = MortTableConfig::builder()
 //!     .data(mort_data)
 //!     .radix(10_000)
 //!     .build()?;
 //!
 //! // Calculate the present value of a whole life annuity (a_x)
-//! let a_x = aax().mt(&mt).i(0.04).x(65).call()?;
+//! let a_x = aax().mt(&mt).i(0.04).x(65.0).call()?;
 //!
 //! // Calculate the present value of a term insurance (A_xn)
-//! let A_xn = Axn().mt(&mt).i(0.04).x(40).n(20).call()?;
+//! let A_xn = Axn().mt(&mt).i(0.04).x(40.0).n(20.0).call()?;
 //!
 //! // Compute commutation function Dx
-//! let D_x = Dx().mt(&mt).i(0.04).x(50).call()?;
+//! let D_x = Dx().mt(&mt).i(0.04).x(50.0).call()?;
 //!
 //! // Compute survival probability tpx
 //! let t_p_x = tpx().mt(&mt).x(30.0).t(10.0).call()?;
@@ -48,4 +48,5 @@
 pub mod annuities;
 pub mod benefits;
 pub mod commutations;
+mod helpers;
 pub mod survivals;

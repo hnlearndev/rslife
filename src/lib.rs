@@ -15,8 +15,8 @@
 //! ```rust
 //! use rslife::prelude::*;
 //!
-//! // Load AM92 mortality data from IFOA databse
-//! let data = MortData::from_ifoa_url_id("AM92")?;
+//! // Load AM92 mortality data
+//! let data = MortData::from_builtin("AM92")?;
 //!
 //! // Default every other parameters: 10,000 radix, 100% mortality, UDD assumption
 //! let mt_config = MortTableConfig::builder().data(data).build().unwrap();
@@ -24,14 +24,14 @@
 //! let whole_life = Ax()
 //!     .mt(&mt_config)
 //!     .i(0.03)
-//!     .x(35)
+//!     .x(35.0)
 //!     .call()?;
 //!
 //! let annuity = aaxn()
 //!     .mt(&mt_config)
 //!     .i(0.03)
-//!     .x(35)
-//!     .n(10)
+//!     .x(35.0)
+//!     .n(10.0)
 //!     .call()?;
 //!
 //! let survival = tpx()
@@ -66,7 +66,6 @@
 
 pub type RSLifeResult<T> = Result<T, Box<dyn std::error::Error>>;
 pub mod annuities_certain;
-pub mod helpers;
 pub mod int_rate_convert;
 pub mod macros;
 pub mod mt_config;

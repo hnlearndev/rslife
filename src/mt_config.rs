@@ -11,8 +11,8 @@
 //! ## Quick Start
 //! ```rust
 //! # use rslife::prelude::*;
-//! // Load a mortality table from SOA by ID
-//! let data = MortData::from_soa_url_id(1704)?;
+//! // Load a mortality table
+//! let data = MortData::from_builtin("AM92")?;
 //! let config = MortTableConfig::builder().data(data).build()?;
 //! // Config is ready for use with actuarial functions
 //! println!("Config created with radix: {:?}", config.radix);
@@ -37,6 +37,7 @@
 
 // Create a structure for the module
 mod aga_xls;
+mod builtin;
 mod ifoa_xls;
 pub mod mt_data;
 mod soa_xml;
@@ -45,8 +46,6 @@ mod spreadsheet_helpers;
 // Declare the module for MortData
 use self::mt_data::MortData;
 use crate::RSLifeResult;
-use crate::helpers::get_new_config_with_selected_table;
-use crate::params::GetValueFunctionValidation;
 use bon::bon;
 use garde::Validate;
 use polars::prelude::*;
@@ -215,61 +214,6 @@ impl MortTableConfig {
             .ok_or_else(|| PolarsError::ComputeError("No duration data available".into()))
     }
 
-    #[builder]
-    pub fn lx(
-        &self,
-        x: u32,
-        entry_age: Option<u32>,
-        #[builder(default = true)] validate: bool,
-    ) -> RSLifeResult<f64> {
-        get_value(self, "lx", x, entry_age, validate)
-    }
-
-    #[builder]
-    pub fn qx(
-        &self,
-        x: u32,
-        entry_age: Option<u32>,
-        #[builder(default = true)] validate: bool,
-    ) -> RSLifeResult<f64> {
-        get_value(self, "qx", x, entry_age, validate)
-    }
-
-    #[builder]
-    pub fn dx(
-        &self,
-        x: u32,
-        entry_age: Option<u32>,
-        #[builder(default = true)] validate: bool,
-    ) -> RSLifeResult<f64> {
-        let lx = get_value(self, "lx", x, entry_age, validate)?;
-
-        // if x is max age in table, return lx (assume 100% mortality)
-        let max_age = self.max_age()?;
-        if x == max_age {
-            return Ok(lx); // No deaths at max age
-        }
-        // dx = lx - lx₊₁
-        let lx = get_value(self, "lx", x, entry_age, validate)?;
-
-        // Either use entry_age to deduce duration (x+1), or use duration+1
-        let lx_next = get_value(self, "lx", x + 1, entry_age, validate)?;
-
-        Ok(lx - lx_next)
-    }
-
-    #[builder]
-    pub fn px(
-        &self,
-        x: u32,
-        entry_age: Option<u32>,
-        #[builder(default = true)] validate: bool,
-    ) -> RSLifeResult<f64> {
-        // px = 1 - qx
-        let qx = get_value(self, "qx", x, entry_age, validate)?;
-        Ok(1.0 - qx)
-    }
-
     fn get_qx_lx_data_config(&self) -> RSLifeResult<Self> {
         let df = self.data.dataframe.clone();
         let has_lx = df.get_column_names().contains(&&"lx".into());
@@ -282,7 +226,7 @@ impl MortTableConfig {
             (0, 0) // dummy values, won't be used for 1D
         };
 
-        let new_df = match (is_2d, has_lx, has_qx) {
+        let (new_df, new_radix) = match (is_2d, has_lx, has_qx) {
             // 1D
             (false, true, false) => get_qx_from_lx_1D(df), // When lx is present, compute qx from lx
             (false, false, true) => get_lx_from_qx_1D(df, radix), // When qx is present, compute lx from qx
@@ -290,7 +234,7 @@ impl MortTableConfig {
             (true, true, false) => get_qx_from_lx_2D(df, min_dur, max_dur), // When lx is present, compute qx from lx
             (true, false, true) => get_lx_from_qx_2D(df, min_dur, max_dur, radix), // When qx is present, compute lx from qx
             // If both lx and qx are present, return the DataFrame as-is
-            (_, true, true) => Ok(df.clone()),
+            (_, true, true) => Ok((df.clone(), radix)),
             _ => Err(PolarsError::ComputeError(
                 "Mortality table format not recognized".into(),
             )),
@@ -298,6 +242,7 @@ impl MortTableConfig {
 
         let mut config = self.clone();
         config.data.dataframe = new_df;
+        config.radix = new_radix;
 
         // Return the configured MortTableConfig
         Ok(config)
@@ -308,46 +253,10 @@ impl MortTableConfig {
 // PRIVATE FUNCTIONS
 // ================================================
 
-fn get_value(
-    mt: &MortTableConfig,
-    column_name: &str,
-    x: u32,
-    entry_age: Option<u32>,
-    validate: bool,
-) -> RSLifeResult<f64> {
-    // Validate the parameters
-    if validate {
-        let params = GetValueFunctionValidation {
-            mt: mt.clone(),
-            x,
-            entry_age,
-        };
-
-        params
-            .validate_all()
-            .map_err(|err| Box::new(err) as Box<dyn std::error::Error>)?;
-    }
-
-    // Decide if selected table is used
-    let mt = get_new_config_with_selected_table(mt, entry_age)?;
-    let df = mt.data.dataframe;
-
-    // Filter the DataFrame for the specified age
-    let filtered_df = df.clone().lazy().filter(col("age").eq(lit(x))).collect()?;
-
-    // Get the value from the specified column
-    let series = filtered_df.column(column_name)?;
-    let value = series
-        .f64()?
-        .get(0)
-        .ok_or_else(|| PolarsError::ComputeError(format!("No value found for age {x}").into()))?;
-
-    Ok(value)
-}
-
 // --------1D data----------
 
-fn get_qx_from_lx_1D(df: DataFrame) -> PolarsResult<DataFrame> {
+// Get qx and radix from lx for 1D data . Use the radix from lx
+fn get_qx_from_lx_1D(df: DataFrame) -> PolarsResult<(DataFrame, u32)> {
     let age_vec = df
         .column("age")?
         .u32()?
@@ -372,16 +281,23 @@ fn get_qx_from_lx_1D(df: DataFrame) -> PolarsResult<DataFrame> {
     // At the last age, qx = 1.0 (certainty of death)
     qx_vec.push(1.0);
 
-    let result = DataFrame::new(vec![
+    let height = age_vec.len();
+
+    // Get the max value of lx (before lx_vec is moved into the Series)
+    let radix = lx_vec.iter().copied().reduce(f64::max).unwrap() as u32;
+
+    let columns = vec![
         Series::new("age".into(), age_vec).into_column(),
         Series::new("qx".into(), qx_vec).into_column(),
         Series::new("lx".into(), lx_vec).into_column(),
-    ])?;
+    ];
 
+    let df = DataFrame::new(height, columns)?;
+    let result = (df, radix);
     Ok(result)
 }
 
-fn get_lx_from_qx_1D(df: DataFrame, radix: u32) -> PolarsResult<DataFrame> {
+fn get_lx_from_qx_1D(df: DataFrame, radix: u32) -> PolarsResult<(DataFrame, u32)> {
     // Convert to f64 for calculations - Keep u32 for input consistency
     let radix = f64::from(radix);
 
@@ -410,12 +326,15 @@ fn get_lx_from_qx_1D(df: DataFrame, radix: u32) -> PolarsResult<DataFrame> {
         lx_vec.push(lx);
     }
 
-    let result = DataFrame::new(vec![
+    let height = age_vec.clone().len();
+    let columns = vec![
         Series::new("age".into(), age_vec).into_column(),
         Series::new("qx".into(), qx_vec).into_column(),
         Series::new("lx".into(), lx_vec).into_column(),
-    ])?;
+    ];
+    let df = DataFrame::new(height, columns)?;
 
+    let result = (df, radix as u32);
     Ok(result)
 }
 
@@ -423,11 +342,20 @@ fn get_lx_from_qx_1D(df: DataFrame, radix: u32) -> PolarsResult<DataFrame> {
 
 // --------
 // Get qx from lx for 2D data
-fn get_qx_from_lx_2D(df: DataFrame, min_dur: u32, max_dur: u32) -> PolarsResult<DataFrame> {
+fn get_qx_from_lx_2D(df: DataFrame, min_dur: u32, max_dur: u32) -> PolarsResult<(DataFrame, u32)> {
     let df = _pivot_2D_data(df, "lx")?;
     let df = _get_all_qx_columns_2D(df, min_dur, max_dur)?;
     let df = _unpivot_data_2D(df, min_dur, max_dur)?;
-    Ok(df)
+    // Radix is the max value of lx
+    let radix = df
+        .column("lx")?
+        .f64()?
+        .into_iter()
+        .flatten()
+        .reduce(f64::max)
+        .unwrap() as u32;
+    let result = (df, radix);
+    Ok(result)
 }
 
 fn _get_all_qx_columns_2D(df: DataFrame, min_dur: u32, max_dur: u32) -> PolarsResult<DataFrame> {
@@ -457,7 +385,7 @@ fn _get_all_qx_columns_2D(df: DataFrame, min_dur: u32, max_dur: u32) -> PolarsRe
         }
 
         // Add the new column to the DataFrame
-        df.with_column(Series::new(qx_current_col_name.into(), qx_current_values))?;
+        df.with_column(Series::new(qx_current_col_name.into(), qx_current_values).into())?;
     }
 
     Ok(df)
@@ -470,12 +398,13 @@ fn get_lx_from_qx_2D(
     min_dur: u32,
     max_dur: u32,
     radix: u32,
-) -> PolarsResult<DataFrame> {
+) -> PolarsResult<(DataFrame, u32)> {
     let mut df = _pivot_2D_data(df, "qx")?;
     df = _get_lx_ultimate_2D(df, max_dur, radix)?;
     df = _get_all_lx_columns_2D(df, min_dur, max_dur)?;
     df = _unpivot_data_2D(df, min_dur, max_dur)?;
-    Ok(df)
+    let result = (df, radix);
+    Ok(result)
 }
 
 fn _get_lx_ultimate_2D(df: DataFrame, max_dur: u32, radix: u32) -> PolarsResult<DataFrame> {
@@ -498,7 +427,7 @@ fn _get_lx_ultimate_2D(df: DataFrame, max_dur: u32, radix: u32) -> PolarsResult<
     }
     // Now lx_values.len() == qx_ultimate_series.len()
     let mut df = df;
-    df.with_column(Series::new(lx_col_name.into(), lx_values))?;
+    df.with_column(Series::new(lx_col_name.into(), lx_values).into())?;
 
     Ok(df)
 }
@@ -528,10 +457,7 @@ fn _get_all_lx_columns_2D(df: DataFrame, min_dur: u32, max_dur: u32) -> PolarsRe
         }
 
         // Add the new column to the DataFrame
-        df.with_column(Series::new(
-            lx_current_col_name.clone().into(),
-            lx_current_values,
-        ))?;
+        df.with_column(Series::new(lx_current_col_name.clone().into(), lx_current_values).into())?;
     }
 
     Ok(df)
@@ -546,6 +472,8 @@ fn _unpivot_data_2D(df: DataFrame, min_dur: u32, max_dur: u32) -> PolarsResult<D
         .into_no_null_iter()
         .collect::<Vec<_>>();
 
+    let height = age_series.clone().len();
+
     // Loop over all durations
     for duration in min_dur..=max_dur {
         let qx_col = format!("qx_{duration}");
@@ -558,13 +486,13 @@ fn _unpivot_data_2D(df: DataFrame, min_dur: u32, max_dur: u32) -> PolarsResult<D
         let duration_vec = vec![duration; age_series.len()];
 
         // Build new DataFrame for this duration
-        let lf = DataFrame::new(vec![
+        let columns = vec![
             Series::new("age".into(), age_series.clone()).into_column(),
             Series::new("qx".into(), qx_vec).into_column(),
             Series::new("lx".into(), lx_vec).into_column(),
             Series::new("duration".into(), duration_vec).into_column(),
-        ])?
-        .lazy();
+        ];
+        let lf = DataFrame::new(height, columns)?.lazy();
 
         long_lfs.push(lf);
     }
@@ -608,130 +536,17 @@ fn _pivot_2D_data(df: DataFrame, value_column: &str) -> PolarsResult<DataFrame> 
 // ================================================
 // UNIT TESTS
 // ================================================
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::mt_config::MortTableConfig;
-    use approx::assert_abs_diff_eq;
-
-    #[test]
-    fn test_fn_qx_01() {
-        // Construct a MortTableConfig with Standard Ultimate Life Table (SULT) data
-        let sult = MortData::from_soa_custom("SULT").expect("Failed to load SULT");
-        let mt = MortTableConfig::builder()
-            .data(sult)
-            .radix(100_000)
-            .build()
-            .unwrap();
-
-        let age = [20, 49, 100];
-        let expected_qx = [0.000250, 0.001100, 0.289584]; // This is obtained from exam materails
-        for (i, &a) in age.iter().enumerate() {
-            let qx = mt.qx().x(a).call().unwrap();
-            assert_abs_diff_eq!(qx, expected_qx[i], epsilon = 1e-6);
-        }
-    }
-
-    #[test]
-    fn test_fn_lx_01() {
-        // Construct a MortTableConfig with Standard Ultimate Life Table (SULT) data
-        let sult = MortData::from_soa_custom("SULT").expect("Failed to load SULT");
-        let mt = MortTableConfig::builder()
-            .data(sult)
-            .radix(100_000)
-            .build()
-            .unwrap();
-
-        let age = [20, 49, 100];
-        let expected_lx = [100_000.0, 98_684.9, 6_248.2];
-        for (i, &a) in age.iter().enumerate() {
-            let lx = mt.lx().x(a).call().unwrap();
-            assert_abs_diff_eq!(lx, expected_lx[i], epsilon = 1e-1);
-        }
-    }
-
-    #[test]
-    fn test_fn_lx_02() {
-        // Construct a MortTableConfig with AM92 data
-        let am92 = MortData::from_ifoa_url_id("AM92").expect("Failed to load AM92 selected table");
-        let mt = MortTableConfig::builder()
-            .data(am92)
-            .radix(10_000)
-            .build()
-            .unwrap();
-        // lx, age 62, entry age 60 = ultimate lx
-        let ans = mt.lx().x(62).entry_age(60).call().unwrap();
-        let expected = 9129.717;
-        assert_abs_diff_eq!(ans, expected, epsilon = 1e-3);
-    }
-
-    #[test]
-    fn test_fn_dx() {
-        // Construct a MortTableConfig with AM92 data
-        let am92 = MortData::from_ifoa_url_id("AM92").expect("Failed to load AM92 selected table");
-        let mt = MortTableConfig::builder()
-            .data(am92)
-            .radix(10_000)
-            .build()
-            .unwrap();
-        // dx, age 47, entry age 46
-        let ans = mt.dx().x(47).entry_age(46).call().unwrap();
-        let expected = 16.9517;
-        assert_abs_diff_eq!(ans, expected, epsilon = 1e-4);
-    }
-
-    #[test]
-    fn test_fn_get_value_2D_dat_01() {
-        // Construct a MortTableConfig with AM92 data
-        let am92 = MortData::from_ifoa_url_id("AM92").expect("Failed to load AM92 selected table");
-        let mt = MortTableConfig::builder()
-            .data(am92)
-            .radix(10_000)
-            .build()
-            .unwrap();
-
-        let ans = mt.lx().x(30).entry_age(29).call().unwrap();
-        let expected = 9924.8916; // Expected lx value for age 30, duration 1
-        assert_abs_diff_eq!(ans, expected, epsilon = 1e-4);
-    }
-
-    #[test]
-    fn test_fn_get_value_2D_data_02() {
-        // Construct a MortTableConfig with AM92 data
-        let am92 = MortData::from_ifoa_url_id("AM92").expect("Failed to load AM92 selected table");
-        let mt = MortTableConfig::builder()
-            .data(am92)
-            .radix(10_000)
-            .build()
-            .unwrap();
-
-        let ans = mt.dx().x(44).entry_age(44).call().unwrap();
-        let expected = 10.7533; // Expected lx value for age 30, duration 1
-        assert_abs_diff_eq!(ans, expected, epsilon = 1e-4);
-    }
-
-    #[test]
-    fn test_fn_get_value_2D_data_03() {
-        // Construct a MortTableConfig with AM92 data
-        let am92 = MortData::from_ifoa_url_id("AM92").expect("Failed to load AM92 selected table");
-        let mt = MortTableConfig::builder()
-            .data(am92)
-            .radix(10_000)
-            .build()
-            .unwrap();
-
-        // let ans = mt.qx().x(59).call().unwrap();
-        let ans = mt.qx().x(59).entry_age(40).call().unwrap(); // This will use ultimate qx
-        let expected = 0.007140; // Expected lx value for age 30, duration 1
-        // assert_abs_diff_eq!(ans, ans_2, epsilon = 1e-4);
-        assert_abs_diff_eq!(ans, expected, epsilon = 1e-4);
-    }
 
     // -----------------------------------------------------
     // Test data print out
     #[test]
     fn test_fn_get_qx_lx_data() {
-        let am92 = MortData::from_ifoa_url_id("AM92").expect("Failed to load AM92 selected table");
+        let am92 = MortData::from_builtin("AM92").expect("Failed to load AM92 selected table");
         let mt = MortTableConfig::builder()
             .data(am92)
             .radix(10_000)
@@ -743,7 +558,7 @@ mod tests {
 
     #[test]
     fn test_lx_from_qx_2d_demo() {
-        let am92 = MortData::from_ifoa_url_id("AM92").expect("Failed to load AM92 selected table");
+        let am92 = MortData::from_builtin("AM92").expect("Failed to load AM92 selected table");
         let mt = MortTableConfig::builder()
             .data(am92)
             .radix(10_000)
@@ -764,7 +579,7 @@ mod tests {
 
     #[test]
     fn test_qx_from_lx_2d_demo() {
-        let am92 = MortData::from_ifoa_url_id("AM92").expect("Failed to load AM92 selected table");
+        let am92 = MortData::from_builtin("AM92").expect("Failed to load AM92 selected table");
         let mt = MortTableConfig::builder()
             .data(am92)
             .radix(10_000)
@@ -778,6 +593,7 @@ mod tests {
         let df1 = _get_all_qx_columns_2D(df_pivot.clone(), min_dur, max_dur).unwrap();
         println!("\nStep 2: _get_all_qx_columns_2D\n{}", df1.head(Some(10)));
         let df2 = _unpivot_data_2D(df1.clone(), min_dur, max_dur).unwrap();
-        println!("\nStep 3: _unpivot_data_2D\n{}", df2.head(Some(10)));
+        println!("\nStep 3a: _unpivot_data_2D\n{}", df2.head(Some(10)));
+        println!("\nStep 3b: _unpivot_data_2D\n{}", df2.tail(Some(10)));
     }
 }

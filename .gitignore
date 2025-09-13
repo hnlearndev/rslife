@@ -28,6 +28,9 @@ Cargo.lock
 .DS_Store
 Thumbs.db
 
+# Documentation
+DEPLOYMENT.md
+
 # Logs
 *.log
 
@@ -39,5 +42,10 @@ Thumbs.db
 node_modules/
 
 
+archived/
+
 # Large reference files
 *.pdf
+
+# WIP examples
+examples/cm1_sep_2025.rs

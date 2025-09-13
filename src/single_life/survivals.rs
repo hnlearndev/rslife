@@ -1,12 +1,13 @@
-use crate::RSLifeResult;
-use crate::helpers::get_new_config_with_selected_table;
+use super::helpers::{get_lx_and_qx, get_new_config_with_selected_table, get_value};
 use crate::mt_config::{AssumptionEnum, MortTableConfig};
 use crate::params::SurvivalFunctionParams;
+use crate::RSLifeResult;
 use bon::builder;
 
 // =======================================
 // PUBLIC FUNCTIONS
 // =======================================
+
 /// Survival probability: ₜpₓ (probability of surviving t years from age x, fractional ages supported)
 ///
 /// Computes the probability that a life aged `x` survives for `t` years, supporting both integer and fractional ages/times.
@@ -44,9 +45,9 @@ use bon::builder;
 /// # Examples
 ///
 /// ## Basic Survival Probability
-/// ```rust
+/// ```rust,no_run
 /// # use rslife::prelude::*;
-/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder()
 /// #     .data(mort_data)
 /// #     .radix(100_000)
@@ -61,9 +62,9 @@ use bon::builder;
 /// ```
 ///
 /// ## Fractional Age Survival
-/// ```rust
+/// ```rust,no_run
 /// # use rslife::prelude::*;
-/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder()
 /// #     .data(mort_data)
 /// #     .radix(100_000)
@@ -162,9 +163,9 @@ pub fn tpx(
 /// # Examples
 ///
 /// ## Basic Mortality Probability
-/// ```rust
+/// ```rust,no_run
 /// # use rslife::prelude::*;
-/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder()
 /// #     .data(mort_data)
 /// #     .radix(100_000)
@@ -179,9 +180,9 @@ pub fn tpx(
 /// ```
 ///
 /// ## Deferred Mortality Probability (e.g., probability of dying between years 3 and 8 from age 55)
-/// ```rust
+/// ```rust,no_run
 /// # use rslife::prelude::*;
-/// # let mort_data = MortData::from_soa_url_id(1704)?;
+/// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build()?;
 /// let prob = tqx().mt(&config).x(55.0).t(5.0).k(3.0).call()?;
 /// println!("Probability of dying between years 3 and 8: {:.6}", prob);
@@ -212,15 +213,136 @@ pub fn tqx(
     Ok(kpx - ktpx)
 }
 
+/// Number of lives: lₓ (expected number of lives at age x from the mortality table)
+///
+/// Computes lₓ for any age `x`, including fractional ages, using the survival probability from the
+/// nearest whole age below.
+///
+/// # Formula
+/// ```text
+/// l_x = ₜp_⌊x⌋ · l_⌊x⌋   where t = x - ⌊x⌋
+/// ```
+///
+/// When `entry_age` is provided, uses the selected mortality table starting from that entry age.
+///
+/// Refer to `tpx` for fractional-age interpolation details.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// # use rslife::prelude::*;
+/// # let mort_data = MortData::from_builtin("AM92")?;
+/// # let config = MortTableConfig::builder().data(mort_data).build()?;
+/// let lives = lx().mt(&config).x(40.0).call()?;
+/// println!("Lives at age 40: {:.2}", lives);
+/// # RSLifeResult::Ok(())
+/// ```
+#[builder]
+pub fn lx(
+    mt: &MortTableConfig,
+    x: f64,
+    entry_age: Option<u32>,
+    #[builder(default = true)] validate: bool,
+) -> RSLifeResult<f64> {
+    if validate {
+        let params = SurvivalFunctionParams {
+            mt: mt.clone(),
+            x,
+            t: 0.0,
+            k: 0.0,
+            entry_age,
+        };
+
+        params
+            .validate_all()
+            .map_err(|err| Box::new(err) as Box<dyn std::error::Error>)?;
+    }
+
+    // Decide if selected table is used
+    let mt = get_new_config_with_selected_table(mt, entry_age)?;
+    let x_floor = x.floor() as u32;
+    let x_frac = x.fract();
+
+    // If x is whole, just return lx directly
+    if x_frac == 0.0 {
+        return get_value(&mt, x_floor, None, "lx");
+    }
+
+    let (lx, lx_next, qx) = get_lx_and_qx(&mt, x_floor)?;
+    let result = match mt.assumption {
+        AssumptionEnum::UDD => lx * (1.0 - x_frac) + lx_next * x_frac,
+
+        // ₜpₓ = (1 - qₓ)ᵗ
+        AssumptionEnum::CFM => (1.0 - qx).powf(x_frac) * lx,
+
+        // ₜpₓ = 1 - t · qₓ
+        _ => (1.0 - x_frac * qx) * lx,
+    };
+    Ok(result)
+}
+
+/// Number of deaths: dₓ (expected number of deaths between age x and x+1)
+///
+/// Computes dₓ as the difference between the number of lives at age x and age x+1.
+///
+/// # Formula
+/// ```text
+/// dₓ = lₓ - lₓ₊₁
+/// ```
+///
+/// When `entry_age` is provided, uses the selected mortality table starting from that entry age.
+///
+/// Refer to `lx` for details on the lives function.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// # use rslife::prelude::*;
+/// # let mort_data = MortData::from_builtin("AM92")?;
+/// # let config = MortTableConfig::builder().data(mort_data).build()?;
+/// let deaths = dx().mt(&config).x(40.0).call()?;
+/// println!("Deaths between age 40 and 41: {:.2}", deaths);
+/// # RSLifeResult::Ok(())
+/// ```
+#[builder]
+pub fn dx(
+    mt: &MortTableConfig,
+    x: f64,
+    entry_age: Option<u32>,
+    #[builder(default = true)] validate: bool,
+) -> RSLifeResult<f64> {
+    if validate {
+        let params = SurvivalFunctionParams {
+            mt: mt.clone(),
+            x,
+            t: 0.0,
+            k: 0.0,
+            entry_age,
+        };
+
+        params
+            .validate_all()
+            .map_err(|err| Box::new(err) as Box<dyn std::error::Error>)?;
+    }
+
+    // Decide if selected table is used
+    let mt = get_new_config_with_selected_table(mt, entry_age)?;
+    let lx_curr = lx().mt(&mt).x(x).validate(validate).call()?;
+    let lx_next = lx().mt(&mt).x(x + 1.0).validate(validate).call()?;
+    Ok(lx_curr - lx_next)
+}
+
 // =======================================
 // PRIVATE FUNCTIONS
 // =======================================
+
 /// Calculate ₜpₓ: probability of surviving t years from age x (whole ages only).
 ///
 /// Formula: ₜpₓ = lₓ₊ₜ / lₓ
 fn tpx_whole(mt: &MortTableConfig, x: u32, t: u32) -> RSLifeResult<f64> {
-    let l_x_t = mt.lx().x(x + t).call()?;
-    let l_x = mt.lx().x(x).call()?;
+    // Filter lx from the mortality table DataFrame by age value
+    let l_x_t = get_value(mt, x + t, None, "lx")?;
+    let l_x = get_value(mt, x, None, "lx")?;
     Ok(l_x_t / l_x)
 }
 
@@ -231,19 +353,16 @@ fn tpx_frac_t(mt: &MortTableConfig, x: f64, t: f64) -> RSLifeResult<f64> {
     let x_whole = x.floor() as u32;
     let x_frac = x.fract();
 
-    let qx = mt.qx().x(x_whole).call()?;
+    let qx = get_value(mt, x_whole, None, "qx")?;
 
     let survival_rate = match mt.assumption {
-        // ------UDD------:
         // ₜqₓ₊ₛ = t · qₓ / (1 - s · qₓ)
         // ₜpₓ₊ₛ = 1 - t · qₓ / (1 - s · qₓ)
         AssumptionEnum::UDD => 1.0 - t * qx / (1.0 - x_frac * qx),
 
-        // ------CFM------:
         // ₜpₓ₊ₛ = (1 - qₓ)ᵗ
         AssumptionEnum::CFM => (1.0 - qx).powf(t),
 
-        // ------HPB-------:
         // ₜqₓ₊ₛ = t · qₓ / (1 + s · qₓ)
         // ₜpₓ₊ₛ = 1 - t · qₓ / (1 + s · qₓ)
         _ => 1.0 - t * qx / (1.0 + x_frac * qx),
@@ -255,6 +374,7 @@ fn tpx_frac_t(mt: &MortTableConfig, x: f64, t: f64) -> RSLifeResult<f64> {
 // ================================================
 // UNIT TESTS
 // ================================================
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -263,9 +383,10 @@ mod tests {
     use approx::assert_abs_diff_eq;
 
     #[test]
-    fn test_survival_cm1_01() {
+    fn test_tpx_01() {
         // This is obtain from CM1 study package 2019 Chapter 15 The Life Table
-        let am92 = MortData::from_soa_url_id(1704).expect("Failed to load EL15 No.15 Female table");
+        let am92 =
+            MortData::from_builtin("ELT15_F").expect("Failed to load EL15 No.15 Female table");
         let mt = MortTableConfig::builder().data(am92).build().unwrap();
         let ans = tpx().mt(&mt).x(58.0).t(0.5).k(0.0).call().unwrap();
         let expected = 0.99670;
@@ -273,11 +394,10 @@ mod tests {
     }
 
     #[test]
-    fn test_survival_cm1_02() {
+    fn test_tpx_02() {
         // This is obtain from CM1 study package 2019 Chapter 15 The Life Table
         // CFM assumption with PFA92C20
-        let pfa92c20 =
-            MortData::from_ifoa_custom("PFA92C20").expect("Failed to load PFA92C20 table");
+        let pfa92c20 = MortData::from_builtin("PFA92C20").expect("Failed to load PFA92C20 table");
         let mt = MortTableConfig::builder()
             .data(pfa92c20)
             .assumption(AssumptionEnum::CFM)
@@ -291,41 +411,33 @@ mod tests {
     }
 
     #[test]
-    fn test_survival_cm1_03() {
+    fn test_tpx_03() {
         // This is obtain from CM1 study package 2019 Chapter 15 The Life Table
         // UDD assumtion with PFA92C20
-        let pfa92c20 =
-            MortData::from_ifoa_custom("PFA92C20").expect("Failed to load PFA92C20 table");
+        let pfa92c20 = MortData::from_builtin("PFA92C20").expect("Failed to load PFA92C20 table");
         let mt = MortTableConfig::builder().data(pfa92c20).build().unwrap();
 
         // Calculate  ₃p₆₂.₅
-        let ans = tpx().mt(&mt).x(62.5).t(3.0).k(0.0).call().unwrap();
+        let ans = tpx().mt(&mt).x(62.5).t(3.0).call().unwrap();
         let expected = 0.988863;
         assert_abs_diff_eq!(ans, expected, epsilon = 1e-6);
     }
 
     #[test]
-    fn test_survival_cm1_04() {
+    fn test_tpx_04() {
         // This is obtain from CM1 study package 2019 Chapter 15 The Life Table
-        let am92 = MortData::from_ifoa_url_id("AM92").expect("Failed to load AM92 selected table");
+        let am92 = MortData::from_builtin("AM92").expect("Failed to load AM92 selected table");
         let mt = MortTableConfig::builder().data(am92).build().unwrap();
         // Calculate  ₃p₆₂.₅
-        let ans = tpx()
-            .mt(&mt)
-            .x(42.0)
-            .t(2.0)
-            .k(0.0)
-            .entry_age(42)
-            .call()
-            .unwrap();
+        let ans = tpx().mt(&mt).x(42.0).t(2.0).entry_age(42).call().unwrap();
         let expected = 0.997929;
         assert_abs_diff_eq!(ans, expected, epsilon = 1e-6);
     }
 
     #[test]
-    fn test_survival_cm1_05() {
+    fn test_tqx_01() {
         // This is obtain from CM1 study package 2019 Chapter 15 The Life Table
-        let am92 = MortData::from_ifoa_url_id("AM92").expect("Failed to load AM92 selected table");
+        let am92 = MortData::from_builtin("AM92").expect("Failed to load AM92 selected table");
         let mt = MortTableConfig::builder().data(am92).build().unwrap();
         // Calculate ₃q(₄₀)₊₁
         let ans = tqx()
@@ -341,13 +453,37 @@ mod tests {
     }
 
     #[test]
-    fn test_survival_cm1_06() {
+    fn test_tqx_02() {
         // This is obtain from CM1 study package 2019 Chapter 15 The Life Table
-        let am92 = MortData::from_ifoa_url_id("AM92").expect("Failed to load AM92 selected table");
+        let am92 = MortData::from_builtin("AM92").expect("Failed to load AM92 selected table");
         let mt = MortTableConfig::builder().data(am92).build().unwrap();
         // Calculate ₂|q(₄₁)₊₁
         let ans = tqx().mt(&mt).x(42.0).k(2.0).entry_age(41).call().unwrap();
         let expected = 0.001324;
         assert_abs_diff_eq!(ans, expected, epsilon = 1e-6);
+    }
+
+    #[test]
+    fn test_lx_01() {
+        // This is obtain from CM1 study package 2019 Chapter 15 The Life Table
+        let am92 = MortData::from_builtin("AM92").expect("Failed to load AM92 selected table");
+        let mt = MortTableConfig::builder()
+            .data(am92)
+            .radix(10000)
+            .build()
+            .unwrap();
+        let ans = (
+            // l₍₄₂₎ duration 0
+            lx().mt(&mt).x(42.0).entry_age(42).call().unwrap(),
+            // l₍[₄₁]+₁₎ duration 1
+            lx().mt(&mt).x(42.0).entry_age(41).call().unwrap(),
+            // Ultimate
+            lx().mt(&mt).x(42.0).call().unwrap(),
+        );
+        let expected = (9834.7030, 9836.5245, 9837.0661);
+        [ans.0, ans.1, ans.2]
+            .into_iter()
+            .zip([expected.0, expected.1, expected.2])
+            .fold((), |_, (a, e)| assert_abs_diff_eq!(a, e, epsilon = 1e-4));
     }
 }

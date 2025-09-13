@@ -1,10 +1,10 @@
 use super::aga_xls::AusGovActMortXLS;
 use super::ifoa_xls::IFOAMortXLS;
 use super::soa_xml::SOAMortXML;
-use crate::RSLifeResult;
 use crate::mt_config::spreadsheet_helpers::*;
+use crate::RSLifeResult;
 use bon::bon;
-use calamine::{Reader, open_workbook_auto};
+use calamine::{open_workbook_auto, Reader};
 use polars::prelude::*;
 use spreadsheet_ods::read_ods;
 use std::fs;
@@ -71,6 +71,7 @@ impl MortData {
     // ========================================================
     // Parametric Mortality Laws
     // ========================================================
+
     /// Create a parametric mortality table using the Constant Force Law.
     ///
     /// The force of mortality is constant:
@@ -626,8 +627,32 @@ impl MortData {
     }
 
     // ========================================================
+    // COMMON PRELOADED TABLES (FxHashMap cache)
+    // ========================================================
+
+    /// Load a mortality table from the preloaded builtin cache.
+    ///
+    /// Tables are loaded once at first access and cached in an `FxHashMap`.
+    /// Subsequent calls are O(1) lookups with no I/O overhead.
+    ///
+    /// # Supported IDs
+    /// - IFOA: `AM92`, `PFA92`, `PMA92`
+    /// - IFOA: `PFA92C10`, `PMA92C10`, `PFA92C20`, `PMA92C20`
+    /// - SOA: `ELT15_F`, `ELT15_M`, `SULT`
+    ///
+    /// # Errors
+    /// Returns an error if the id is not in the builtin cache.
+    pub fn from_builtin(id: &str) -> RSLifeResult<Self> {
+        super::builtin::BUILTIN_MORT_DATA
+            .get(id)
+            .cloned()
+            .ok_or_else(|| format!("Builtin mortality table '{id}' not available").into())
+    }
+
+    // ========================================================
     // AUSTRALIAN GOVERNMENT ACTUARY  XLS  PARSING
     // ========================================================
+
     /// Parse mortality table from Australian Government Actuary XLS URL.
     ///
     /// Downloads and parses mortality table data directly from the Australian Government Actuary (AGA) website. This method makes an HTTP GET request to fetch XLS data, parses the file, and constructs a validated mortality table.
@@ -776,7 +801,9 @@ impl MortData {
             let series = Series::from_vec(col_name.into(), data_col.clone());
             columns.push(series.into_column());
         }
-        let df = DataFrame::new(columns).map_err(|e| format!("Failed to create DataFrame: {e}"))?;
+        let height = columns[0].len();
+        let df = DataFrame::new(height, columns)
+            .map_err(|e| format!("Failed to create DataFrame: {e}"))?;
 
         // Create MortData with a default category
         let category = "Custom Mortality Data".to_string();
@@ -844,7 +871,9 @@ impl MortData {
             let series = Series::from_vec(col_name.into(), data_col.clone());
             columns.push(series.into_column());
         }
-        let df = DataFrame::new(columns).map_err(|e| format!("Failed to create DataFrame: {e}"))?;
+        let height = columns[0].len();
+        let df = DataFrame::new(height, columns)
+            .map_err(|e| format!("Failed to create DataFrame: {e}"))?;
 
         // Create MortData with a default category
         let category = "Custom Mortality Data".to_string();
@@ -930,7 +959,7 @@ fn validate_df_schema(df: &DataFrame) -> RSLifeResult<()> {
         return Err("DataFrame must contain at least one row of data".into());
     }
 
-    let columns = df.get_columns();
+    let columns = df.columns();
     let cols_count = columns.len();
 
     // Check column names using get_column_names
@@ -1079,8 +1108,8 @@ mod tests {
                 println!("  DataFrame shape: {:?}", mort_data.dataframe.shape());
 
                 // Verify basic structure
-                assert!(!mort_data.dataframe.is_empty());
-                assert!(mort_data.dataframe.get_columns().len() >= 2);
+                assert!(mort_data.dataframe.height() > 0);
+                assert!(mort_data.dataframe.columns().len() >= 2);
 
                 // Check that we have age and qx/lx columns
                 let column_names = mort_data.dataframe.get_column_names();
@@ -1117,8 +1146,8 @@ mod tests {
                 println!("  DataFrame shape: {:?}", mort_data.dataframe.shape());
 
                 // Verify basic structure
-                assert!(!mort_data.dataframe.is_empty());
-                assert!(mort_data.dataframe.get_columns().len() >= 2);
+                assert!(mort_data.dataframe.height() > 0);
+                assert!(mort_data.dataframe.columns().len() >= 2);
 
                 // Check that we have age and qx/lx columns
                 let column_names = mort_data.dataframe.get_column_names();
@@ -1152,8 +1181,8 @@ mod tests {
                 println!("  DataFrame shape: {:?}", mort_data.dataframe.shape());
 
                 // Verify basic structure
-                assert!(!mort_data.dataframe.is_empty());
-                assert!(mort_data.dataframe.get_columns().len() >= 2);
+                assert!(mort_data.dataframe.height() > 0);
+                assert!(mort_data.dataframe.columns().len() >= 2);
 
                 // Check that we have age and qx/lx columns
                 let column_names = mort_data.dataframe.get_column_names();
@@ -1187,8 +1216,8 @@ mod tests {
                 println!("  DataFrame shape: {:?}", mort_data.dataframe.shape());
 
                 // Verify basic structure
-                assert!(!mort_data.dataframe.is_empty());
-                assert!(mort_data.dataframe.get_columns().len() >= 2);
+                assert!(mort_data.dataframe.height() > 0);
+                assert!(mort_data.dataframe.columns().len() >= 2);
 
                 // Check that we have age and qx/lx columns
                 let column_names = mort_data.dataframe.get_column_names();
@@ -1216,8 +1245,8 @@ mod tests {
                         println!("  DataFrame shape: {:?}", mort_data.dataframe.shape());
 
                         // Verify basic structure
-                        assert!(!mort_data.dataframe.is_empty());
-                        assert!(mort_data.dataframe.get_columns().len() >= 2);
+                        assert!(mort_data.dataframe.height() > 0);
+                        assert!(mort_data.dataframe.columns().len() >= 2);
                     }
                     Err(e2) => {
                         println!("XLSX file tests failed (files may not be available): {e2}");
@@ -1240,8 +1269,8 @@ mod tests {
                 println!("  DataFrame shape: {:?}", mort_data.dataframe.shape());
 
                 // Verify basic structure
-                assert!(!mort_data.dataframe.is_empty());
-                assert!(mort_data.dataframe.get_columns().len() >= 2);
+                assert!(mort_data.dataframe.height() > 0);
+                assert!(mort_data.dataframe.columns().len() >= 2);
 
                 // Check that we have age and qx/lx columns
                 let column_names = mort_data.dataframe.get_column_names();
@@ -1269,8 +1298,8 @@ mod tests {
                         println!("  DataFrame shape: {:?}", mort_data.dataframe.shape());
 
                         // Verify basic structure
-                        assert!(!mort_data.dataframe.is_empty());
-                        assert!(mort_data.dataframe.get_columns().len() >= 2);
+                        assert!(mort_data.dataframe.height() > 0);
+                        assert!(mort_data.dataframe.columns().len() >= 2);
                     }
                     Err(e2) => {
                         println!("ODS file tests failed (files may not be available): {e2}");

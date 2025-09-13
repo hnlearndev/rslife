@@ -12,7 +12,7 @@ fn main() -> RSLifeResult<()> {
 
     // Load mortality data
     println!("Loading mortality table...");
-    let mort_data = MortData::from_soa_url_id(1704)?;
+    let mort_data = MortData::from_builtin("AM92")?;
 
     // Method 1: Create mortality table configuration using builder pattern
     println!("Creating MortTableConfig using builder pattern...");
@@ -39,9 +39,9 @@ fn main() -> RSLifeResult<()> {
 
     // Life insurance calculations using builder pattern
     println!("\n=== Life Insurance Calculations (UDD assumption, age 30) ===");
-    let term_10 = Ax1n().mt(&mt_config).i(0.03).x(30).n(10).call()?;
-    let term_20 = Ax1n().mt(&mt_config).i(0.03).x(30).n(20).call()?;
-    let endowment_15 = Axn().mt(&mt_config).i(0.03).x(30).n(15).call()?;
+    let term_10 = Ax1n().mt(&mt_config).i(0.03).x(30.0).n(10.0).call()?;
+    let term_20 = Ax1n().mt(&mt_config).i(0.03).x(30.0).n(20.0).call()?;
+    let endowment_15 = Axn().mt(&mt_config).i(0.03).x(30.0).n(15.0).call()?;
 
     println!("Life Insurance:");
     println!("  10-year term (Ax1n): {term_10:.6}");
@@ -50,8 +50,8 @@ fn main() -> RSLifeResult<()> {
 
     // Annuity calculations using CFM assumption
     println!("\n=== Annuity Calculations (CFM assumption, age 40) ===");
-    let annuity_due = aaxn().mt(&mt_config_cfm).i(0.04).x(40).n(15).call()?;
-    let life_annuity = aax().mt(&mt_config_cfm).i(0.04).x(40).call()?;
+    let annuity_due = aaxn().mt(&mt_config_cfm).i(0.04).x(40.0).n(15.0).call()?;
+    let life_annuity = aax().mt(&mt_config_cfm).i(0.04).x(40.0).call()?;
 
     println!("Annuities:");
     println!("  15-year annuity due: {annuity_due:.6}");

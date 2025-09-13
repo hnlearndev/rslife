@@ -17,14 +17,14 @@ fn main() -> RSLifeResult<()> {
 fn q1() -> RSLifeResult<()> {
     // April 2025 CM1 question 1
     // Create a MortTableConfig with AM92 data
-    let am92 = MortData::from_ifoa_url_id("AM92")?;
+    let am92 = MortData::from_builtin("AM92")?;
     let mt = MortTableConfig::builder().data(am92).build()?;
     // Calculation
     let answer = Axn()
         .mt(&mt)
         .i(0.05)
-        .x(70)
-        .n(3)
+        .x(70.0)
+        .n(3.0)
         .entry_age(70)
         .call()
         .unwrap();
@@ -86,17 +86,17 @@ fn q2() -> RSLifeResult<()> {
 
 fn q3() -> RSLifeResult<()> {
     // Create a MortTableConfig with AM92 data
-    let am92 = MortData::from_ifoa_url_id("AM92")?;
+    let am92 = MortData::from_builtin("AM92")?;
     let mt = MortTableConfig::builder().data(am92).build()?;
     // Annuity factor calculation
-    let aax = aax().mt(&mt).i(0.04).x(50).entry_age(50).call().unwrap();
+    let aax = aax().mt(&mt).i(0.04).x(50.0).entry_age(50).call().unwrap();
     // Var calculation via formula
-    let Ax_1st_moment = Ax().mt(&mt).i(0.04).x(50).entry_age(50).call().unwrap();
+    let Ax_1st_moment = Ax().mt(&mt).i(0.04).x(50.0).entry_age(50).call().unwrap();
 
     let Ax_2nd_moment = Ax()
         .mt(&mt)
         .i(0.04)
-        .x(50)
+        .x(50.0)
         .entry_age(50)
         .moment(2)
         .call()
@@ -230,19 +230,19 @@ fn q11() -> RSLifeResult<()> {
     // In order to obtain the regular pattern of geometric rate throughout the term, we need to multiply (1+g) over the present value.
     // We can now use the regular geometric formula
     // Create a MortTableConfig with AM92 data
-    let am92 = MortData::from_ifoa_url_id("AM92")?;
+    let am92 = MortData::from_builtin("AM92")?;
     let mt = MortTableConfig::builder().data(am92).build()?;
 
     // Part (i)
     let g = 0.0192308; // Geometric rate
-    let adjusted_benefit_factor = gAx().mt(&mt).i(0.06).g(g).x(55).call()?; // This is after mutiply 1+g
+    let adjusted_benefit_factor = gAx().mt(&mt).i(0.06).g(g).x(55.0).call()?; // This is after mutiply 1+g
     let benefit_factor = adjusted_benefit_factor / (1.0 + g); // Remove this to get the actual value
-    let premium_factor = aax().mt(&mt).i(0.06).x(55).call()?;
+    let premium_factor = aax().mt(&mt).i(0.06).x(55.0).call()?;
     let premium = (50_000.0 * benefit_factor / premium_factor).round();
 
     // Part (ii)
-    let benefit_factor_at_t_6 = gAx().mt(&mt).i(0.06).g(g).x(61).call()?;
-    let premium_factor_at_t_6 = aax().mt(&mt).i(0.06).x(61).call()?;
+    let benefit_factor_at_t_6 = gAx().mt(&mt).i(0.06).g(g).x(61.0).call()?;
+    let premium_factor_at_t_6 = aax().mt(&mt).i(0.06).x(61.0).call()?;
 
     let death_benefit_at_t_6 = 50_000.0 * (1.0 + g).powf(5.0); // Under geometric rate after 6 years
 
@@ -285,26 +285,26 @@ fn q11() -> RSLifeResult<()> {
 
 fn q12() -> RSLifeResult<()> {
     // Create a MortTableConfig with AM92 data
-    let am92 = MortData::from_ifoa_url_id("AM92")?;
+    let am92 = MortData::from_builtin("AM92")?;
     let mt = MortTableConfig::builder().data(am92).build()?;
 
     // ======Part (i)======
     // EPV of premium 12P.ä₄₀:₂₅̅⁽¹²⁾ = prem_factor * P
-    let premium_factor = 12.0 * aaxn().mt(&mt).i(0.06).x(40).n(25).m(12).call()?;
+    let premium_factor = 12.0 * aaxn().mt(&mt).i(0.06).x(40.0).n(25.0).m(12).call()?;
 
     // I believe there is an issue with examiner's report here with commission in the first year
     // EPV of commission: 12(0.125P).ä₄₀:₁̅⁽¹²⁾ + 12(0.025P)ä₄₀:₂₅̅⁽¹²⁾ = comm_factor * P
-    let comm_factor = 12.0 * 0.125 * aaxn().mt(&mt).i(0.06).x(40).n(1).m(12).call()?
-        + 12.0 * 0.025 * aaxn().mt(&mt).i(0.06).x(40).n(25).m(12).call()?;
+    let comm_factor = 12.0 * 0.125 * aaxn().mt(&mt).i(0.06).x(40.0).n(1.0).m(12).call()?
+        + 12.0 * 0.025 * aaxn().mt(&mt).i(0.06).x(40.0).n(25.0).m(12).call()?;
 
     // EPV of expenses: 80.(ä₄₀:₂₅̅ - 1) = $Expense
-    let expense_amount = 80.0 * (aaxn().mt(&mt).i(0.06).x(40).n(25).m(12).call()? - 1.0);
+    let expense_amount = 80.0 * (aaxn().mt(&mt).i(0.06).x(40.0).n(25.0).m(12).call()? - 1.0);
 
     // EPV of death benefit: 247,500 . A¹₄₀:₂₅̅⁽¹²⁾ + 2,500 . IA¹₄₀:₂₅̅⁽¹²⁾ + (250,000 + 2,500 * 25).  A₄₀:₂₅¹
     // 247,500 . A₄₀:₂₅̅⁽¹²⁾ + 2,500 . IA¹₄₀:₂₅̅⁽¹²⁾ + 2,500 * 26.  A₄₀:₂₅¹ = $Benefit
-    let benefit_amount = 247_500.0 * Axn().mt(&mt).i(0.06).x(40).n(25).m(12).call()?
-        + 2_500.0 * IAxn().mt(&mt).i(0.06).x(40).n(25).m(12).call()?
-        + (2_500.0 * 26.0) * Exn().mt(&mt).i(0.06).x(40).n(25).call()?;
+    let benefit_amount = 247_500.0 * Axn().mt(&mt).i(0.06).x(40.0).n(25.0).m(12).call()?
+        + 2_500.0 * IAxn().mt(&mt).i(0.06).x(40.0).n(25.0).m(12).call()?
+        + (2_500.0 * 26.0) * Exn().mt(&mt).i(0.06).x(40.0).n(25.0).call()?;
 
     // Premium = Benefit - Expense - Commission
     // prem_factor * P = benefit_amount - expense_amount - comm_factor*P
@@ -314,15 +314,15 @@ fn q12() -> RSLifeResult<()> {
     // ======Part (ii)======
     // No calculation required but we can use the same benefit and premium factor to calculate the reserve at time 6
     // EPV of benefit
-    let benefit_ii = (247_500.0 + 2_500.0 * 15.0) * Axn().mt(&mt).i(0.06).x(55).n(10).call()?
-        + 2500.0 * IAxn().mt(&mt).i(0.06).x(55).n(10).call()?
-        + (247_500.0 + 2_500.0 * 25.0) * Exn().mt(&mt).i(0.06).x(55).n(10).call()?;
+    let benefit_ii = (247_500.0 + 2_500.0 * 15.0) * Axn().mt(&mt).i(0.06).x(55.0).n(10.0).call()?
+        + 2500.0 * IAxn().mt(&mt).i(0.06).x(55.0).n(10.0).call()?
+        + (247_500.0 + 2_500.0 * 25.0) * Exn().mt(&mt).i(0.06).x(55.0).n(10.0).call()?;
 
-    let comm_ii = 12.0 * 0.025 * aaxn().mt(&mt).i(0.06).x(55).n(10).m(12).call()?;
+    let comm_ii = 12.0 * 0.025 * aaxn().mt(&mt).i(0.06).x(55.0).n(10.0).m(12).call()?;
 
-    let expense_ii = 80.0 * (aaxn().mt(&mt).i(0.06).x(55).n(10).m(12).call()? - 1.0);
+    let expense_ii = 80.0 * (aaxn().mt(&mt).i(0.06).x(55.0).n(10.0).m(12).call()? - 1.0);
 
-    let premium_ii = 12.0 * premium * aaxn().mt(&mt).i(0.06).x(55).n(10).m(12).call()?;
+    let premium_ii = 12.0 * premium * aaxn().mt(&mt).i(0.06).x(55.0).n(10.0).m(12).call()?;
 
     let reserve_ii = benefit_ii + comm_ii + expense_ii - premium_ii;
 
@@ -330,7 +330,6 @@ fn q12() -> RSLifeResult<()> {
     // Part (i) - This will not be exactly the same as the examiner's report due the error found in comiision
     // let expected_premium = 517.981239344;
     // assert_abs_diff_eq!(expected_premium, premium, epsilon = 1e-6);
-
     //------------------------------------------------------------------------------------
 
     println!("\n=== CM1 April 2025 Q12 Results ===");

@@ -95,6 +95,7 @@ impl SurvivalFunctionParams {
 // =======================================
 // SINGLE LIFE PARAMETER STRUCT
 // =======================================
+
 #[derive(Debug, Clone, Validate, Builder)]
 #[garde(allow_unvalidated)]
 pub struct SingleLifeParams {
@@ -109,17 +110,17 @@ pub struct SingleLifeParams {
 
     // Age - Cannot exceed min and max from mort_table
     // Basic range validation (0-150 years old is reasonable)
-    #[garde(range(max = 150))]
-    pub x: u32,
+    #[garde(range(max = 150.0))]
+    pub x: f64,
 
     // Term - x + n cannot exceed max age from mort_table
     // n can be 0 for some actuarial calculations
-    #[garde(range(max = 150))]
-    pub n: u32,
+    #[garde(range(max = 150.0))]
+    pub n: f64,
 
     // Deferral period
-    #[garde(range(max = 150))]
-    pub t: u32,
+    #[garde(range(max = 150.0))]
+    pub t: f64,
 
     // Payable m-thly
     // If not None must be greater than 0
@@ -167,12 +168,12 @@ impl SingleLifeParams {
         };
 
         // Validate age boundaries
-        validate_age_boundaries(self.x as f64, min_age, max_age, &mut errors);
+        validate_age_boundaries(self.x, min_age, max_age, &mut errors);
 
         // Validate term constraints (custom for SingleLifeParams)
-        let x = self.x as f64;
-        let t = self.t as f64;
-        let n = self.n as f64;
+        let x = self.x;
+        let t = self.t;
+        let n = self.n;
         if x + t + n > max_age {
             errors.push(("", format!(
                 "age + deferral + term ({x} + {t} + {n}) cannot exceed max age {max_age} from mortality table"
@@ -180,7 +181,7 @@ impl SingleLifeParams {
         }
 
         // Validate entry age constraints
-        validate_entry_age(self.entry_age, x, min_age, &mut errors);
+        validate_entry_age(self.entry_age, self.x, min_age, &mut errors);
 
         // Convert errors to report
         for (path, message) in errors {
@@ -199,6 +200,7 @@ impl SingleLifeParams {
 // =======================================
 // CUSTOM GET VALUE FUNCTION VALIDATION STRUCT
 // =======================================
+
 #[derive(Debug, Clone, Validate, Builder)]
 #[garde(allow_unvalidated)]
 pub struct GetValueFunctionValidation {
@@ -209,8 +211,8 @@ pub struct GetValueFunctionValidation {
 
     // Age - Cannot exceed min and max from mort_table
     // Basic range validation (0-150 years old is reasonable)
-    #[garde(range(max = 150))]
-    pub x: u32,
+    #[garde(range(max = 150.0))]
+    pub x: f64,
 
     // Entry age for select-ultimate tables,
     // Entry age cannot exceed age x
@@ -248,12 +250,10 @@ impl GetValueFunctionValidation {
         };
 
         // Validate age boundaries
-        validate_age_boundaries(self.x as f64, min_age, max_age, &mut errors);
-
-        let x = self.x as f64;
+        validate_age_boundaries(self.x, min_age, max_age, &mut errors);
 
         // Validate entry age constraints
-        validate_entry_age(self.entry_age, x, min_age, &mut errors);
+        validate_entry_age(self.entry_age, self.x, min_age, &mut errors);
 
         // Convert errors to report
         for (path, message) in errors {
@@ -303,17 +303,21 @@ fn validate_age_boundaries(x: f64, min_age: f64, max_age: f64, errors: &mut Erro
 
 fn validate_entry_age(entry_age: Option<u32>, x: f64, min_age: f64, errors: &mut ErrorVec) {
     if let Some(entry_age) = entry_age {
-        if (entry_age as f64) > x {
+        let entry_age_f = entry_age as f64;
+        if entry_age_f > x {
             errors.push((
                 "entry_age",
                 format!("entry_age {entry_age} cannot exceed age {x}"),
             ));
         }
 
-        if (entry_age as f64) < min_age {
-            errors.push(("entry_age", format!(
+        if entry_age_f < min_age {
+            errors.push((
+                "entry_age",
+                format!(
                 "entry_age {entry_age} cannot be less than min age {min_age} from mortality table"
-            )));
+            ),
+            ));
         }
     }
 }

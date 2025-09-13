@@ -450,7 +450,8 @@ fn create_values(table_node: &roxmltree::Node) -> RSLifeResult<DataFrame> {
     }
 
     let columns: Vec<Column> = columns_vec.into_iter().map(|s| s.into_column()).collect();
-    let df = DataFrame::new(columns)?;
+    let height = columns[0].len();
+    let df = DataFrame::new(height, columns)?;
 
     let result = if df
         .get_column_names()
@@ -515,5 +516,6 @@ fn get_axis_values(axis_node: &roxmltree::Node) -> RSLifeResult<AxisValues> {
 //-----------------------------------------------------------------
 // UNIT TEST
 //-----------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {}

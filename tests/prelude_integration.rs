@@ -99,7 +99,7 @@ fn test_prelude_with_real_data() {
         .unwrap();
 
     // Test direct function calls (the new API)
-    let whole_life_result = Ax().mt(&mt_config).i(0.03).x(20).call();
+    let whole_life_result = Ax().mt(&mt_config).i(0.03).x(20.0).call();
 
     let survival_result = tpx().mt(&mt_config).x(20.0).t(3.0).call();
 
