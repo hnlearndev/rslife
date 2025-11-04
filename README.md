@@ -2,8 +2,8 @@
 
 <a href="https://crates.io/crates/rslife">
   <picture>
-    <source srcset="https://raw.githubusercontent.com/hnlearndev/static/refs/heads/main/rslife/banner/banner-dark.svg" media="(prefers-color-scheme: dark)">
-    <img src="https://raw.githubusercontent.com/hnlearndev/static/refs/heads/main/rslife/banner/banner-light.svg" alt="RSLife logo">
+    <source srcset="https://raw.githubusercontent.com/hnlearndev/static/refs/heads/main/rslife/banner/banner_dark.svg" media="(prefers-color-scheme: dark)">
+    <img src="https://raw.githubusercontent.com/hnlearndev/static/refs/heads/main/rslife/banner/banner_light.svg" alt="RSLife logo">
   </picture>
 </a>
 
