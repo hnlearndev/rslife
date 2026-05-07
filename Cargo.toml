@@ -1,6 +1,6 @@
 [package]
 name = "rslife"
-version = "0.2.9"
+version = "0.2.10"
 edition = "2024"
 rust-version = "1.90.0"
 description = "A comprehensive Rust library for actuarial mortality table calculations and life insurance mathematics"

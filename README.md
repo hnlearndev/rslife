@@ -21,7 +21,7 @@
 | :----------: | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
 |   **MSRV**   |  [![Build Status - MSRV](https://github.com/hnlearndev/rslife/actions/workflows/rust-1.90.0.yml/badge.svg?branch=main)](https://github.com/hnlearndev/rslife/actions/workflows/rust-1.90.0.yml)  |  [![Test Status - MSRV](https://github.com/hnlearndev/rslife/actions/workflows/rust-1.90.0.yml/badge.svg?branch=main)](https://github.com/hnlearndev/rslife/actions/workflows/rust-1.90.0.yml)  |
 |  **Stable**  | [![Build Status - Stable](https://github.com/hnlearndev/rslife/actions/workflows/rust-stable.yml/badge.svg?branch=main)](https://github.com/hnlearndev/rslife/actions/workflows/rust-stable.yml) | [![Test Status - Stable](https://github.com/hnlearndev/rslife/actions/workflows/rust-stable.yml/badge.svg?branch=main)](https://github.com/hnlearndev/rslife/actions/workflows/rust-stable.yml) |
-| **Nightly**  |       [![Nightly](https://github.com/hnlearndev/rslife/actions/workflows/rust-nightly.yml/badge.svg?branch=main)](https://github.com/hnlearndev/rslife/actions/workflows/rust-nightly.yml)       |      [![Nightly](https://github.com/hnlearndev/rslife/actions/workflows/rust-nightly.yml/badge.svg?branch=main)](https://github.com/hnlearndev/rslife/actions/workflows/rust-nightly.yml)       |
+| **Nightly**  |       [![Nightly](https://github.com/hnlearndev/rslife/actions/workflows/rust-nightly.yml/badge.svg?branch=main)](https://github.com/hnlearndev/rslife/actions/workflows/rust-nightly.yml)       |                                                                                                —                                                                                                |
 
 </div>
 
@@ -75,7 +75,7 @@ Or add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rslife = "0.2.9"
+rslife = "0.2.10"
 ```
 
 The crate is designed with three main layers to make actuarial computations convenient (more on [architecture from Wiki](https://github.com/hnlearndev/rslife/wiki/Architecture)), as illustrated below:
