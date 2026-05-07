@@ -1,10 +1,10 @@
 use super::aga_xls::AusGovActMortXLS;
 use super::ifoa_xls::IFOAMortXLS;
 use super::soa_xml::SOAMortXML;
-use crate::mt_config::spreadsheet_helpers::*;
 use crate::RSLifeResult;
+use crate::mt_config::spreadsheet_helpers::*;
 use bon::bon;
-use calamine::{open_workbook_auto, Reader};
+use calamine::{Reader, open_workbook_auto};
 use polars::prelude::*;
 use spreadsheet_ods::read_ods;
 use std::fs;

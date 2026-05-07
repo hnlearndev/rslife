@@ -1,6 +1,6 @@
-use crate::mt_config::spreadsheet_helpers::{parse_excel_data, parse_excel_headers};
 use crate::RSLifeResult;
-use calamine::{open_workbook_auto, Data, Reader, Xls};
+use crate::mt_config::spreadsheet_helpers::{parse_excel_data, parse_excel_headers};
+use calamine::{Data, Reader, Xls, open_workbook_auto};
 use polars::prelude::*;
 use reqwest::blocking::get;
 use std::io::Cursor;
@@ -147,7 +147,7 @@ impl IFOAMortXLS {
         };
 
         let range = if !xls_name.is_empty() {
-            fetch_range_from_local_data(&xls_name, sheet_name)?
+            fetch_range_from_local_data(xls_name, sheet_name)?
         } else {
             fetch_range_from_url(&url, sheet_name)?
         };
@@ -172,7 +172,7 @@ impl IFOAMortXLS {
 
         // Check if xls_name is some string then use it
         let range = if !xls_name.is_empty() {
-            fetch_range_from_local_data(&xls_name, sheet_name)?
+            fetch_range_from_local_data(xls_name, sheet_name)?
         } else {
             fetch_range_from_url(&url, sheet_name)?
         };

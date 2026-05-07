@@ -20,18 +20,18 @@ pub use crate::mt_config::{AssumptionEnum, MortTableConfig};
 // All actuarial calculation functions (implementation functions from whole.rs)
 pub use crate::int_rate_convert::*;
 
-pub use crate::annuities_certain::{aan, an, Daan, Dan, Iaan, Ian};
+pub use crate::annuities_certain::{Daan, Dan, Iaan, Ian, aan, an};
 
 pub use crate::single_life::survivals::{dx, lx, tpx, tqx};
 
 pub use crate::single_life::commutations::{Cx, Dx, Mx, Nx, Rx, Sx};
 
 pub use crate::single_life::benefits::{
-    gAx, gAx1n, gAxn, Ax, Ax1n, Axn, Axn1, DAx1n, DAxn, Exn, IAx, IAx1n, IAxn,
+    Ax, Ax1n, Axn, Axn1, DAx1n, DAxn, Exn, IAx, IAx1n, IAxn, gAx, gAx1n, gAxn,
 };
 
 pub use crate::single_life::annuities::{
-    aax, aaxn, ax, axn, gaax, gaaxn, gax, gaxn, Daaxn, Daxn, Iaax, Iaaxn, Iax, Iaxn,
+    Daaxn, Daxn, Iaax, Iaaxn, Iax, Iaxn, aax, aaxn, ax, axn, gaax, gaaxn, gax, gaxn,
 };
 
 // Most commonly used Polars types for working with mortality tables

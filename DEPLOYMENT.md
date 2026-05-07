@@ -163,6 +163,17 @@ cargo run --example cm1_sep_2025
 
 ```bash
 jj describe -m "chore: bump version to 0.3.0"
+```
+
+If `main` bookmark is conflicted, resolve it first:
+
+```bash
+jj bookmark set main -r @
+```
+
+Then push:
+
+```bash
 jj git push --branch main
 ```
 

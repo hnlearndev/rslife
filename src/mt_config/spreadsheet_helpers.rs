@@ -45,10 +45,8 @@ pub fn parse_ods_data(
 
         for col in 0..ncols {
             let cell_value = sheet.value(row_num as u32, col as u32);
-            let val = match parse_ods_f64_cell(cell_value, row_num + 1, &format!("col{col}")) {
-                Ok(v) => v,
-                Err(_) => f64::NAN,
-            };
+            let val = parse_ods_f64_cell(cell_value, row_num + 1, &format!("col{col}"))
+                .unwrap_or(f64::NAN);
             if !val.is_nan() {
                 has_data = true;
             }
@@ -134,10 +132,8 @@ pub fn parse_excel_data(
 
         for col in 0..ncols {
             let cell = range.get((row_num, col));
-            let val = match parse_excel_f64_cell(cell, row_num + 1, &format!("col{col}")) {
-                Ok(v) => v,
-                Err(_) => f64::NAN,
-            };
+            let val =
+                parse_excel_f64_cell(cell, row_num + 1, &format!("col{col}")).unwrap_or(f64::NAN);
 
             // There might be columns empty but other are not - turn to true once there is a value
             if !val.is_nan() {
