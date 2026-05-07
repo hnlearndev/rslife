@@ -14,7 +14,7 @@
 | ------------------ | --------------------------------------------------- |
 | `rust.yml`         | General CI (build + test across versions)           |
 | `rust-stable.yml`  | Stable Rust: build, test, clippy lint, format check |
-| `rust-1.95.0.yml`  | MSRV (Minimum Supported Rust Version) compatibility |
+| `rust-1.90.0.yml`  | MSRV (Minimum Supported Rust Version) compatibility |
 | `rust-nightly.yml` | Nightly Rust compatibility testing                  |
 | `coverage.yml`     | Test coverage via grcov → Codecov                   |
 
