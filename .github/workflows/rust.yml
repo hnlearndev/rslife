@@ -36,9 +36,13 @@ jobs:
 
       - name: Build
         run: cargo build --verbose
+        env:
+          CARGO_BUILD_JOBS: 2
 
       - name: Run tests
         run: cargo test --all --verbose
+        env:
+          CARGO_BUILD_JOBS: 2
 
       - name: Run clippy (linter)
         run: cargo clippy --all -- -D warnings

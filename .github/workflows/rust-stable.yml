@@ -2,9 +2,9 @@ name: Rust Stable CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build-and-test-stable:
@@ -24,9 +24,13 @@ jobs:
 
       - name: Build
         run: cargo build --verbose
+        env:
+          CARGO_BUILD_JOBS: 2
 
       - name: Run tests
         run: cargo test --all --verbose
+        env:
+          CARGO_BUILD_JOBS: 2
 
       - name: Run clippy (linter)
         run: cargo clippy --all -- -D warnings

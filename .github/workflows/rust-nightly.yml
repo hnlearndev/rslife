@@ -2,14 +2,14 @@ name: Rust Nightly CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build-and-test-nightly:
     runs-on: ubuntu-latest
-    continue-on-error: true  # Allow nightly builds to fail without failing the entire workflow
+    continue-on-error: true # Allow nightly builds to fail without failing the entire workflow
 
     steps:
       - name: Install system dependencies
@@ -25,9 +25,13 @@ jobs:
 
       - name: Build
         run: cargo build --verbose
+        env:
+          CARGO_BUILD_JOBS: 2
 
       - name: Run tests
         run: cargo test --all --verbose
+        env:
+          CARGO_BUILD_JOBS: 2
 
       - name: Run clippy (linter)
         run: cargo clippy --all -- -D warnings
