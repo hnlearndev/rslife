@@ -207,6 +207,7 @@ For frequently used tables, RSLife provides a preloaded cache via `MortData::fro
 ```rust
 // IFOA tables
 let am92 = MortData::from_builtin("AM92")?;
+let af92 = MortData::from_builtin("AF92")?;
 let pfa92 = MortData::from_builtin("PFA92")?;
 let pma92 = MortData::from_builtin("PMA92")?;
 
@@ -225,6 +226,7 @@ let sult = MortData::from_builtin("SULT")?;
 | ID         | Source | Description                               |
 | :--------- | :----: | :---------------------------------------- |
 | `AM92`     |  IFOA  | Male Assured Lives, 1991–94 experience    |
+| `AF92`     |  IFOA  | Female Assured Lives, 1991–94 experience  |
 | `PFA92`    |  IFOA  | Female Pensioners, 1991–94 experience     |
 | `PMA92`    |  IFOA  | Male Pensioners, 1991–94 experience       |
 | `PFA92C10` |  IFOA  | Female Pensioners, projected to year 2010 |

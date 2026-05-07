@@ -1,10 +1,10 @@
 use super::aga_xls::AusGovActMortXLS;
 use super::ifoa_xls::IFOAMortXLS;
 use super::soa_xml::SOAMortXML;
-use crate::RSLifeResult;
 use crate::mt_config::spreadsheet_helpers::*;
+use crate::RSLifeResult;
 use bon::bon;
-use calamine::{Reader, open_workbook_auto};
+use calamine::{open_workbook_auto, Reader};
 use polars::prelude::*;
 use spreadsheet_ods::read_ods;
 use std::fs;
@@ -586,6 +586,7 @@ impl MortData {
     // ========================================================
     // IFOA XLS  PARSING
     // ========================================================
+
     pub fn from_ifoa_xls_file_path_str(file_path: &str, sheet_name: &str) -> RSLifeResult<Self> {
         let data = IFOAMortXLS::from_xls_file_path_str(file_path, sheet_name)?;
         let result = Self::new(
@@ -624,29 +625,6 @@ impl MortData {
             data.dataframe,
         )?;
         Ok(result)
-    }
-
-    // ========================================================
-    // COMMON PRELOADED TABLES (FxHashMap cache)
-    // ========================================================
-
-    /// Load a mortality table from the preloaded builtin cache.
-    ///
-    /// Tables are loaded once at first access and cached in an `FxHashMap`.
-    /// Subsequent calls are O(1) lookups with no I/O overhead.
-    ///
-    /// # Supported IDs
-    /// - IFOA: `AM92`, `PFA92`, `PMA92`
-    /// - IFOA: `PFA92C10`, `PMA92C10`, `PFA92C20`, `PMA92C20`
-    /// - SOA: `ELT15_F`, `ELT15_M`, `SULT`
-    ///
-    /// # Errors
-    /// Returns an error if the id is not in the builtin cache.
-    pub fn from_builtin(id: &str) -> RSLifeResult<Self> {
-        super::builtin::BUILTIN_MORT_DATA
-            .get(id)
-            .cloned()
-            .ok_or_else(|| format!("Builtin mortality table '{id}' not available").into())
     }
 
     // ========================================================
@@ -692,6 +670,7 @@ impl MortData {
     // ========================================================
     // OTHER PARSING METHODS
     // ========================================================
+
     /// Create mortality table from existing Polars DataFrame.
     ///
     /// Convenience method to create MortData from a pre-existing DataFrame
@@ -880,6 +859,29 @@ impl MortData {
         let description =
             "Created from XLSX file {xlsx_file_path_str}, sheet {sheet_name}.".to_string();
         Self::new(category, description, df)
+    }
+
+    // ========================================================
+    // COMMON PRELOADED TABLES (FxHashMap cache)
+    // ========================================================
+
+    /// Load a mortality table from the preloaded builtin cache.
+    ///
+    /// Tables are loaded once at first access and cached in an `FxHashMap`.
+    /// Subsequent calls are O(1) lookups with no I/O overhead.
+    ///
+    /// # Supported IDs
+    /// - IFOA: `AM92`, `AF92`, `PFA92`, `PMA92`
+    /// - IFOA: `PFA92C10`, `PMA92C10`, `PFA92C20`, `PMA92C20`
+    /// - SOA: `ELT15_F`, `ELT15_M`, `SULT`
+    ///
+    /// # Errors
+    /// Returns an error if the id is not in the builtin cache.
+    pub fn from_builtin(id: &str) -> RSLifeResult<Self> {
+        super::builtin::BUILTIN_MORT_DATA
+            .get(id)
+            .cloned()
+            .ok_or_else(|| format!("Builtin mortality table '{id}' not available").into())
     }
 }
 

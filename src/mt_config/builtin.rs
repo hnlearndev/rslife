@@ -23,7 +23,7 @@ pub static BUILTIN_MORT_DATA: Lazy<FxHashMap<&'static str, MortData>> = Lazy::ne
     let mut map = FxHashMap::default();
 
     // Standard IFOA tables (embedded 92series.xls etc via ifoa_xls module)
-    for id in ["AM92", "PFA92", "PMA92"] {
+    for id in ["AM92", "AF92", "PFA92", "PMA92"] {
         match MortData::from_ifoa_url_id(id) {
             Ok(data) => {
                 map.insert(id, data);
