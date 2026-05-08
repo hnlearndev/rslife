@@ -3,9 +3,9 @@
 
 use super::helpers::get_new_config_with_selected_table;
 use super::survivals::{tpx, tqx};
-use crate::RSLifeResult;
 use crate::mt_config::MortTableConfig;
-use crate::params::SingleLifeParams;
+use crate::param::SingleLifeParams;
+use crate::RSLifeResult;
 use bon::builder;
 
 // =======================================
@@ -1092,8 +1092,8 @@ fn benefit_procedure(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mt_config::MortTableConfig;
     use crate::mt_config::mt_data::MortData;
+    use crate::mt_config::MortTableConfig;
     use approx::assert_abs_diff_eq;
 
     // #[test]
@@ -1279,81 +1279,5 @@ mod tests {
         let ans = IAx1n().mt(&mt).i(0.04).x(50.0).n(10.0).call().unwrap();
         let expected = 8.55929 - (882.85 / 1366.61) * (8.36234 + 10.0 * 0.45640);
         assert_abs_diff_eq!(ans, expected, epsilon = 1e-4);
-    }
-
-    #[test]
-    fn test_debug_am92_structure() {
-        let am92 = MortData::from_builtin("AM92").expect("Failed to load AM92 selected table");
-        let mt = MortTableConfig::builder().data(am92).build().unwrap();
-        // Debug output
-        println!("DataFrame shape: {:?}", mt.data.dataframe.shape());
-        println!("Column names: {:?}", mt.data.dataframe.get_column_names());
-        println!("Min age: {:?}", mt.min_age());
-        println!("Max age: {:?}", mt.max_age());
-
-        // Print first few rows
-        println!("First 5 rows:\n{}", mt.data.dataframe.head(Some(5)));
-
-        // Check if age column exists and has data
-        if let Ok(age_col) = mt.data.dataframe.column("age") {
-            println!("Age column type: {:?}", age_col.dtype());
-            if let Ok(age_series) = age_col.u32() {
-                let values: Vec<_> = age_series.iter().take(10).collect();
-                println!("First 10 age values: {values:?}");
-            }
-        }
-
-        assert!(
-            mt.min_age().unwrap() > 0,
-            "Min age should be greater than 0"
-        );
-        assert!(
-            mt.max_age().unwrap() > mt.min_age().unwrap(),
-            "Max age should be greater than min age"
-        );
-    }
-
-    #[test]
-    fn test_debug_selected_table_processing() {
-        // Create a MortTableConfig with AM92 data
-        let am92 = MortData::from_builtin("AM92").expect("Failed to load AM92 selected table");
-        let mt = MortTableConfig::builder().data(am92).build().unwrap();
-
-        println!("Original table:");
-        println!("  Shape: {:?}", mt.data.dataframe.shape());
-        println!("  Min age: {:?}, Max age: {:?}", mt.min_age(), mt.max_age());
-        println!(
-            "  Min duration: {:?}, Max duration: {:?}",
-            mt.min_duration(),
-            mt.max_duration()
-        );
-
-        // Test with entry_age = 70 (same as failing test)
-        let selected_mt = get_new_config_with_selected_table(&mt, Some(70)).unwrap();
-
-        println!("Selected table (entry_age=70):");
-        println!("  Shape: {:?}", selected_mt.data.dataframe.shape());
-        println!(
-            "  Min age: {:?}, Max age: {:?}",
-            selected_mt.min_age(),
-            selected_mt.max_age()
-        );
-        println!(
-            "  Column names: {:?}",
-            selected_mt.data.dataframe.get_column_names()
-        );
-        println!(
-            "  First 10 rows:\n{}",
-            selected_mt.data.dataframe.head(Some(10))
-        );
-
-        assert!(
-            selected_mt.min_age().unwrap() > 0,
-            "Selected table min age should be greater than 0"
-        );
-        assert!(
-            selected_mt.max_age().unwrap() >= selected_mt.min_age().unwrap(),
-            "Selected table max age should be >= min age"
-        );
     }
 }

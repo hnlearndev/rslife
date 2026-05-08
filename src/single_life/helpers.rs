@@ -3,8 +3,8 @@
 //! Provides DataFrame lookup utilities and mortality table configuration
 //! helpers used by `survivals`, `commutations`, `annuities`, and `benefits`.
 
-use crate::RSLifeResult;
 use crate::mt_config::MortTableConfig;
+use crate::RSLifeResult;
 use polars::prelude::*;
 
 // ================================================
@@ -145,19 +145,20 @@ fn get_ultimate_mortality_table(mt: &MortTableConfig) -> PolarsResult<DataFrame>
 fn get_selected_mortality_table(mt: &MortTableConfig, entry_age: u32) -> PolarsResult<DataFrame> {
     let df = &mt.data.dataframe;
 
+    let min_age = mt.min_age()?;
     let max_age = mt.max_age()?;
     let max_dur = mt.max_duration()?;
 
-    let age_vec: Vec<u32> = (entry_age..=max_age).collect();
+    // Entry age below this has NO meaning in calculation and interpretation
+    let start_age = u32::max(entry_age, min_age.saturating_sub(max_dur));
+    let age_vec: Vec<u32> = (start_age..=max_age).collect();
     let mut qx_vec: Vec<f64> = vec![0.0; age_vec.len()];
     let mut lx_vec: Vec<f64> = vec![0.0; age_vec.len()];
 
     for (i, &age) in age_vec.iter().enumerate() {
-        let duration = (age - entry_age).min(max_dur);
-
+        let duration = u32::min(age - entry_age, max_dur); // age runs from start
         let qx = get_value_2d(df, age, duration, "qx")?;
         let lx = get_value_2d(df, age, duration, "lx")?;
-
         qx_vec[i] = qx;
         lx_vec[i] = lx;
     }
@@ -174,25 +175,29 @@ fn get_selected_mortality_table(mt: &MortTableConfig, entry_age: u32) -> PolarsR
 }
 
 /// Filter a column value from a 2D DataFrame by age and duration.
+/// Returns 0.0 if data not found (e.g., age below table's min_age).
 fn get_value_2d(df: &DataFrame, age: u32, duration: u32, col_name: &str) -> PolarsResult<f64> {
-    df.clone()
+    let result = df
+        .clone()
         .lazy()
         .filter(col("age").eq(lit(age)))
         .filter(col("duration").eq(lit(duration)))
         .select([col(col_name)])
-        .collect()?
-        .column(col_name)?
-        .f64()?
-        .get(0)
-        .ok_or_else(|| {
-            PolarsError::ComputeError(
-                format!(
-                    "{} not found for age {} duration {}",
-                    col_name, age, duration
-                )
-                .into(),
+        .collect()?;
+
+    if result.height() == 0 {
+        return Ok(0.0);
+    }
+
+    result.column(col_name)?.f64()?.get(0).ok_or_else(|| {
+        PolarsError::ComputeError(
+            format!(
+                "{} not found for age {} duration {}",
+                col_name, age, duration
             )
-        })
+            .into(),
+        )
+    })
 }
 
 // ================================================
@@ -202,16 +207,17 @@ fn get_value_2d(df: &DataFrame, age: u32, duration: u32, col_name: &str) -> Pola
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mt_config::MortTableConfig;
     use crate::mt_config::mt_data::MortData;
+    use crate::mt_config::MortTableConfig;
 
     #[test]
     fn test_get_new_config_with_selected_table() {
         let am92 = MortData::from_builtin("AM92").expect("Failed to load AM92");
         let mt = MortTableConfig::builder().data(am92).build().unwrap();
 
-        // With entry_age = Some(40)
-        let selected = get_new_config_with_selected_table(&mt, Some(40)).unwrap();
+        // With entry_age = 11, min_age = 17, the table still starts at age 15 as value below that is irrelevant for caluclation
+        // The age boundaries of tables are used for validation purpose.
+        let selected = get_new_config_with_selected_table(&mt, Some(11)).unwrap();
         println!(
             "Selected table (entry_age=40):\n{}",
             selected.data.dataframe

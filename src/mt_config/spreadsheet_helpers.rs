@@ -188,3 +188,4 @@ fn parse_excel_f64_cell(
         None => Err(format!("Missing {col_name} cell at row {row_num}").into()),
     }
 }
+

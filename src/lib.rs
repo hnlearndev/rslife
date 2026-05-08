@@ -69,6 +69,6 @@ pub mod annuities_certain;
 pub mod int_rate_convert;
 pub mod macros;
 pub mod mt_config;
-pub mod params;
+pub mod param;
 pub mod prelude;
 pub mod single_life;

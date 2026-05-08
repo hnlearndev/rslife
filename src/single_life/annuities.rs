@@ -3,9 +3,9 @@
 
 use super::helpers::get_new_config_with_selected_table;
 use super::survivals::tpx;
-use crate::RSLifeResult;
 use crate::mt_config::MortTableConfig;
-use crate::params::SingleLifeParams;
+use crate::param::SingleLifeParams;
+use crate::RSLifeResult;
 use bon::builder;
 
 // ==================In arrears==================
@@ -31,7 +31,7 @@ use bon::builder;
 /// # Examples
 ///
 /// ## Basic Temporary Annuity-Due
-/// ```rust,no_run
+/// ```rust
 /// # use rslife::prelude::*;
 /// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build().unwrap();
@@ -87,7 +87,7 @@ pub fn axn(
 /// # Examples
 ///
 /// ## Basic Temporary Annuity-Due
-/// ```rust,no_run
+/// ```rust
 /// # use rslife::prelude::*;
 /// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build().unwrap();
@@ -147,7 +147,7 @@ pub fn ax(
 /// # Examples
 ///
 /// ## Basic Increasing Temporary Annuity-Due
-/// ```rust,no_run
+/// ```rust
 /// # use rslife::prelude::*;
 /// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build().unwrap();
@@ -203,7 +203,7 @@ pub fn Iaxn(
 /// # Examples
 ///
 /// ## Basic Increasing Life Annuity-Due
-/// ```rust,no_run
+/// ```rust
 /// # use rslife::prelude::*;
 /// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build().unwrap();
@@ -263,7 +263,7 @@ pub fn Iax(
 /// # Examples
 ///
 /// ## Basic Decreasing Temporary Annuity-Due
-/// ```rust,no_run
+/// ```rust
 /// # use rslife::prelude::*;
 /// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build().unwrap();
@@ -314,7 +314,7 @@ pub fn Daxn(
 /// # Examples
 ///
 /// ## Basic Geometric Temporary Annuity-Due
-/// ```rust,no_run
+/// ```rust
 /// # use rslife::prelude::*;
 /// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build().unwrap();
@@ -372,7 +372,7 @@ pub fn gaxn(
 /// # Examples
 ///
 /// ## Basic Geometric Life Annuity-Due
-/// ```rust,no_run
+/// ```rust
 /// # use rslife::prelude::*;
 /// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build().unwrap();
@@ -435,7 +435,7 @@ pub fn gax(
 /// # Examples
 ///
 /// ## Basic Temporary Annuity-Due
-/// ```rust,no_run
+/// ```rust
 /// # use rslife::prelude::*;
 /// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build().unwrap();
@@ -490,7 +490,7 @@ pub fn aaxn(
 /// # Examples
 ///
 /// ## Basic Life Annuity-Due
-/// ```rust,no_run
+/// ```rust
 /// # use rslife::prelude::*;
 /// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build().unwrap();
@@ -550,7 +550,7 @@ pub fn aax(
 /// # Examples
 ///
 /// ## Basic Increasing Temporary Annuity-Due
-/// ```rust,no_run
+/// ```rust
 /// # use rslife::prelude::*;
 /// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build().unwrap();
@@ -606,7 +606,7 @@ pub fn Iaaxn(
 /// # Examples
 ///
 /// ## Basic Increasing Life Annuity-Due
-/// ```rust,no_run
+/// ```rust
 /// # use rslife::prelude::*;
 /// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build().unwrap();
@@ -666,7 +666,7 @@ pub fn Iaax(
 /// # Examples
 ///
 /// ## Basic Decreasing Temporary Annuity-Due
-/// ```rust,no_run
+/// ```rust
 /// # use rslife::prelude::*;
 /// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build().unwrap();
@@ -719,7 +719,7 @@ pub fn Daaxn(
 /// # Examples
 ///
 /// ## Basic Geometric Life Annuity-Due
-/// ```rust,no_run
+/// ```rust
 /// # use rslife::prelude::*;
 /// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build().unwrap();
@@ -773,7 +773,7 @@ pub fn gaax(
 /// # Examples
 ///
 /// ## Basic Geometric Temporary Annuity-Due
-/// ```rust,no_run
+/// ```rust
 /// # use rslife::prelude::*;
 /// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build().unwrap();
@@ -925,8 +925,8 @@ fn annuity_procedure(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mt_config::MortTableConfig;
     use crate::mt_config::mt_data::MortData;
+    use crate::mt_config::MortTableConfig;
     use approx::assert_abs_diff_eq;
 
     #[test]

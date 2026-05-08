@@ -24,9 +24,10 @@ macro_rules! mddf {
 // ================================================
 // UNIT TESTS
 // ================================================
+
 #[cfg(test)]
 mod tests {
-
+ 
     #[test]
     fn test_mddf_macro_with_qx() {
         let data = mddf! {

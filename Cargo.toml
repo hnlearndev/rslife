@@ -1,6 +1,6 @@
 [package]
 name = "rslife"
-version = "0.2.11"
+version = "0.2.12"
 edition = "2024"
 rust-version = "1.90.0"
 description = "A comprehensive Rust library for actuarial mortality table calculations and life insurance mathematics"
@@ -14,7 +14,7 @@ authors = ["RSLife Contributors"]
 readme = "README.md"
 
 [dependencies]
-calamine = "0.34.0"
+calamine = "0.35.0"
 polars = { version = "0.53.0", features = ["lazy"] }
 reqwest = { version = "0.13.3", features = ["blocking"] }
 roxmltree = "0.21.1"

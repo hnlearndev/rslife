@@ -247,3 +247,60 @@ pub fn nom_d_to_nom_i(nom_d: f64, m_d: u32, m_i: u32) -> f64 {
     let eff_i = nom_d_to_eff_i(nom_d, m_d);
     eff_i_to_nom_i(eff_i, m_i)
 }
+
+// ================================================
+// UNIT TESTS
+// ================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use approx::assert_abs_diff_eq;
+
+    // All the tests values are obtained from Compound Interest Tables, Formulae Tables of IFOA
+    #[test]
+    fn test_fn_05() {
+        let ans = create_answers(0.005);
+        let expected = [
+            0.004994, 0.004991, 0.004989, 0.004988, 0.004975, 0.004981, 0.004984, 0.004987,
+        ];
+        ans.iter()
+            .zip(expected.iter())
+            .fold((), |_, (a, e)| assert_abs_diff_eq!(*a, *e, epsilon = 1e-6));
+    }
+
+    #[test]
+    fn test_fn_10() {
+        let ans = create_answers(0.01);
+        let expected = [
+            0.009975, 0.009963, 0.009954, 0.009950, 0.009901, 0.009926, 0.009938, 0.009946,
+        ];
+        ans.iter()
+            .zip(expected.iter())
+            .fold((), |_, (a, e)| assert_abs_diff_eq!(*a, *e, epsilon = 1e-6));
+    }
+
+    #[test]
+    fn test_fn_80() {
+        let ans = create_answers(0.08);
+        let expected = [
+            0.078461, 0.077706, 0.077208, 0.076961, 0.074074, 0.075499, 0.076225, 0.076715,
+        ];
+        ans.iter()
+            .zip(expected.iter())
+            .fold((), |_, (a, e)| assert_abs_diff_eq!(*a, *e, epsilon = 1e-6));
+    }
+
+    fn create_answers(eff_int_rate: f64) -> Vec<f64> {
+        vec![
+            eff_i_to_nom_i(eff_int_rate, 2),
+            eff_i_to_nom_i(eff_int_rate, 4),
+            eff_i_to_nom_i(eff_int_rate, 12),
+            f64::ln(1.0 + eff_int_rate),
+            eff_i_to_eff_d(eff_int_rate),
+            eff_i_to_nom_d(eff_int_rate, 2),
+            eff_i_to_nom_d(eff_int_rate, 4),
+            eff_i_to_nom_d(eff_int_rate, 12),
+        ]
+    }
+}

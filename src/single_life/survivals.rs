@@ -1,7 +1,7 @@
 use super::helpers::{get_lx_and_qx, get_new_config_with_selected_table, get_value};
-use crate::RSLifeResult;
 use crate::mt_config::{AssumptionEnum, MortTableConfig};
-use crate::params::SurvivalFunctionParams;
+use crate::param::SurvivalFunctionParams;
+use crate::RSLifeResult;
 use bon::builder;
 
 // =======================================
@@ -45,7 +45,7 @@ use bon::builder;
 /// # Examples
 ///
 /// ## Basic Survival Probability
-/// ```rust,no_run
+/// ```rust
 /// # use rslife::prelude::*;
 /// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder()
@@ -62,7 +62,7 @@ use bon::builder;
 /// ```
 ///
 /// ## Fractional Age Survival
-/// ```rust,no_run
+/// ```rust
 /// # use rslife::prelude::*;
 /// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder()
@@ -163,7 +163,7 @@ pub fn tpx(
 /// # Examples
 ///
 /// ## Basic Mortality Probability
-/// ```rust,no_run
+/// ```rust
 /// # use rslife::prelude::*;
 /// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder()
@@ -180,7 +180,7 @@ pub fn tpx(
 /// ```
 ///
 /// ## Deferred Mortality Probability (e.g., probability of dying between years 3 and 8 from age 55)
-/// ```rust,no_run
+/// ```rust
 /// # use rslife::prelude::*;
 /// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build()?;
@@ -229,7 +229,7 @@ pub fn tqx(
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```rust
 /// # use rslife::prelude::*;
 /// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build()?;
@@ -296,7 +296,7 @@ pub fn lx(
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```rust
 /// # use rslife::prelude::*;
 /// # let mort_data = MortData::from_builtin("AM92")?;
 /// # let config = MortTableConfig::builder().data(mort_data).build()?;
