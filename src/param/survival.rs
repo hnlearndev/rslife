@@ -3,7 +3,7 @@ use bon::Builder;
 use garde::Validate;
 
 use super::validation::{
-    collect_age_bounds_errors, validate_age_boundaries, validate_entry_age, ErrorVec,
+    ErrorVec, collect_age_bounds_errors, validate_age_boundaries, validate_entry_age,
 };
 
 #[derive(Debug, Clone, Validate, Builder)]

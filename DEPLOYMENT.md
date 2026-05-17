@@ -84,7 +84,7 @@ jj desc <rev> -m "fix: tuple order" # jj d <rev> -m "..."
 jj git push --branch main          # jj gpush -b main
 
 # Push a specific bookmark (maps to a GitHub PR branch)
-jj git push --bookmark feat-xyz    # jj gpush -B feat-xyz
+   # jj gpush -B feat-xyz
 
 # Push all bookmarks
 jj git push --all                  # jj gpush -a

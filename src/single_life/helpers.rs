@@ -3,8 +3,8 @@
 //! Provides DataFrame lookup utilities and mortality table configuration
 //! helpers used by `survivals`, `commutations`, `annuities`, and `benefits`.
 
-use crate::mt_config::MortTableConfig;
 use crate::RSLifeResult;
+use crate::mt_config::MortTableConfig;
 use polars::prelude::*;
 
 // ================================================
@@ -207,8 +207,8 @@ fn get_value_2d(df: &DataFrame, age: u32, duration: u32, col_name: &str) -> Pola
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mt_config::mt_data::MortData;
     use crate::mt_config::MortTableConfig;
+    use crate::mt_config::mt_data::MortData;
 
     #[test]
     fn test_get_new_config_with_selected_table() {

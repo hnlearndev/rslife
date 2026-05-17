@@ -1,9 +1,9 @@
 #![allow(non_snake_case)]
 use super::helpers::get_new_config_with_selected_table;
 use super::survivals::{dx, lx};
+use crate::RSLifeResult;
 use crate::mt_config::MortTableConfig;
 use crate::param::SingleLifeParams;
-use crate::RSLifeResult;
 use bon::builder;
 
 /// Commutation function Cₓ
@@ -407,8 +407,8 @@ pub fn Sx(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mt_config::mt_data::MortData;
     use crate::mt_config::MortTableConfig;
+    use crate::mt_config::mt_data::MortData;
     use approx::assert_abs_diff_eq;
 
     #[test]

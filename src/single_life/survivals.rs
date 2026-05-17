@@ -1,7 +1,7 @@
 use super::helpers::{get_lx_and_qx, get_new_config_with_selected_table, get_value};
+use crate::RSLifeResult;
 use crate::mt_config::{AssumptionEnum, MortTableConfig};
 use crate::param::SurvivalFunctionParams;
-use crate::RSLifeResult;
 use bon::builder;
 
 // =======================================

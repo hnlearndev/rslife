@@ -3,9 +3,9 @@
 
 use super::helpers::get_new_config_with_selected_table;
 use super::survivals::{tpx, tqx};
+use crate::RSLifeResult;
 use crate::mt_config::MortTableConfig;
 use crate::param::SingleLifeParams;
-use crate::RSLifeResult;
 use bon::builder;
 
 // =======================================
@@ -1092,8 +1092,8 @@ fn benefit_procedure(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mt_config::mt_data::MortData;
     use crate::mt_config::MortTableConfig;
+    use crate::mt_config::mt_data::MortData;
     use approx::assert_abs_diff_eq;
 
     // #[test]
