@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
-use crate::int_rate_convert::{eff_i_to_nom_d, eff_i_to_nom_i};
 use crate::RSLifeResult;
+use crate::int_rate_convert::{eff_i_to_nom_d, eff_i_to_nom_i};
 use bon::builder;
 
 /// Annuity-certain due/in advance
